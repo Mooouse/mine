@@ -15,10 +15,11 @@ Build requires Rust, the wasm32-unknown-unknown target, and wasm-pack:
 ```sh
 cargo install wasm-pack
 wasm-pack build --target web --release --out-dir pkg
-python3 -m http.server 8000
+mkdir -p dist && cp -r web/. dist/ && cp -r pkg dist/pkg
+cd dist && python3 -m http.server 8000
 ```
 
-Open http://localhost:8000/web/ **only after** copying or serving `pkg/` alongside `web/`, or use the generated `dist/` folder from GitHub Actions.
+Open http://localhost:8000 after building, or use the hosted GitHub Pages site.
 
 GitHub Actions compiles and deploys to GitHub Pages.
 
