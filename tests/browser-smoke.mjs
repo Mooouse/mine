@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const url = "http://127.0.0.1:8765/";
+const url = process.env.GAME_URL || "http://127.0.0.1:8765/";
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome",
@@ -18,6 +18,11 @@ page.on("pageerror",e=>errors.push(e.message));
 page.on("console",m=>{ if(m.type()==="error")errors.push(m.text()); });
 
 try{
+  if(url.includes("raw.githack.com")){
+    // This static mirror asks visitors to confirm HTML once per repository.
+    // The automated smoke test opts in through the documented cookie.
+    await page.context().addCookies([{name:"__Http-phish",value:"1",domain:"raw.githack.com",path:"/",secure:true}]);
+  }
   await page.goto(url,{waitUntil:"domcontentloaded",timeout:30000});
   try {
     await page.locator("#loading").waitFor({state:"detached",timeout:18000});
