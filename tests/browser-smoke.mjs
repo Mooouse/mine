@@ -21,7 +21,7 @@ try{
   if(url.includes("raw.githack.com")){
     // This static mirror asks visitors to confirm HTML once per repository.
     // The automated smoke test opts in through the documented cookie.
-    await page.context().addCookies([{name:"__Http-phish",value:"1",domain:"raw.githack.com",path:"/",secure:true}]);
+    await page.context().addCookies([{name:"__Http-phish",value:"1",domain:"raw.githack.com",path:"/",secure:true,httpOnly:true}]);
   }
   await page.goto(url,{waitUntil:"domcontentloaded",timeout:30000});
   try {
