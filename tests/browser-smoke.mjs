@@ -36,7 +36,7 @@ try{
   await page.locator("#inventory").waitFor({state:"visible",timeout:4000});
   if(await page.locator("#storageSlots .inv-slot").count()!==27)throw new Error("Expected 27 storage slots");
   if(await page.locator("#inventoryHotbar .inv-slot").count()!==9)throw new Error("Expected 9 hotbar slots");
-  if(await page.locator("#creativeBlocks .inv-slot").count()!==16)throw new Error("Expected 16 creative materials");
+  if(await page.locator("#creativeBlocks .inv-slot").count()!==24)throw new Error("Expected 24 creative materials");
   await page.locator('#creativeBlocks .inv-slot[aria-label="WATER"]').click();
   await page.locator("#inventoryHotbar .inv-slot").nth(2).click();
   const assigned=await page.locator("#inventoryHotbar .inv-slot").nth(2).getAttribute("aria-label");
@@ -44,7 +44,7 @@ try{
   await page.keyboard.press("Escape");
   await page.locator("#inventory").waitFor({state:"hidden"});
   if(errors.length) throw new Error("Browser errors: "+errors.join(" | "));
-  console.log("PASS: WASM + WebGL2, 36-slot inventory, all creative materials, block transfer, E/Escape controls");
+  console.log("PASS: WASM + WebGL2, 36-slot inventory, 24 original materials, block transfer, E/Escape controls");
 }finally{
   await browser.close();
 }
