@@ -71,6 +71,19 @@ jobs:
         env:
           GAME_URL: https://raw.githack.com/${{ github.repository }}/${{ steps.static.outputs.sha }}/index.html
         run: node tests/browser-smoke.mjs
+      - name: Diagnose published pages and compare revisions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          echo "== Current GitHub Pages configuration =="
+          gh api repos/${GITHUB_REPOSITORY}/pages --jq '{status: .status, build_type: .build_type, source: .source, html_url: .html_url}' || true
+          echo "== GitHub Pages HTML version =="
+          curl --location --max-time 18 -sS -o /tmp/mine_pages.html -w "HTTP %{http_code}; size %{size_download}; final %{url_effective}\n" "https://mooouse.github.io/mine/?ci-check=${GITHUB_SHA}"
+          grep -o -m1 'ALPHA 0\.[0-9]' /tmp/mine_pages.html || echo "No current version marker served"
+          grep -o -m1 'ui-v2.css' /tmp/mine_pages.html || echo "New UI stylesheet not present"
+          echo "== Standalone site branch =="
+          git ls-remote https://github.com/${GITHUB_REPOSITORY}.git refs/heads/site | head -1
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages site
