@@ -21,7 +21,7 @@ const MATERIALS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
 const INITIAL_HOTBAR = [1,2,3,4,5,6,7,9,8];
 const INVENTORY_SIZE=36;
 let inventorySlots=Array.from({length:INVENTORY_SIZE},(_,i)=>INITIAL_HOTBAR[i]||0);
-let inventoryOpen=false, heldItem=0, inventoryFilter="all", lastSpaceTap=-1000, lastWaterTick=0;
+let inventoryOpen=false, heldItem=0, offhandBlock=0, inventoryFilter="all", lastSpaceTap=-1000, lastWaterTick=0;
 function loadInventory(reset=false){
   inventorySlots=Array.from({length:INVENTORY_SIZE},(_,i)=>INITIAL_HOTBAR[i]||0);
   if(!reset){
@@ -32,11 +32,16 @@ function loadInventory(reset=false){
       }
     }catch(e){/* Ignore outdated inventory format. */}
   }
+  offhandBlock=reset?0:(Number(localStorage.getItem("mine_offhand_"+seed))||0);
+  if(offhandBlock<0||offhandBlock>16)offhandBlock=0;
   selected=clamp(selected,0,8);
   renderHotbar();
 }
 function saveInventory(){
-  try{localStorage.setItem("mine_inventory_"+seed,JSON.stringify(inventorySlots));}catch(e){}
+  try{
+    localStorage.setItem("mine_inventory_"+seed,JSON.stringify(inventorySlots));
+    localStorage.setItem("mine_offhand_"+seed,String(offhandBlock));
+  }catch(e){}
 }
 const FACES = [
   { d:[1,0,0], n:[1,0,0], c:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]], light:.78 },
@@ -583,6 +588,10 @@ function inventoryButton(id,index,type){
 }
 function renderHotbar(){
   const hotbar=$("hotbar");hotbar.replaceChildren();
+  const off=$("offhandHud");
+  off.innerHTML=blockIcon(offhandBlock);
+  off.classList.toggle("offhand-empty",!offhandBlock);
+  off.title=offhandBlock?"Offhand: "+BLOCKS[offhandBlock].name+" (F)":"Offhand empty (F)";
   for(let i=0;i<9;i++){
     const id=inventorySlots[i],info=BLOCKS[id];
     const el=document.createElement("button");
@@ -663,8 +672,8 @@ function drawSlot(container,index){
   container.appendChild(b);
 }
 function renderInventory(){
-  const catalog=$("creativeBlocks"),storage=$("storageSlots"),bar=$("inventoryHotbar");
-  catalog.replaceChildren();storage.replaceChildren();bar.replaceChildren();
+  const catalog=$("creativeBlocks"),storage=$("storageSlots"),bar=$("inventoryHotbar"),off=$("inventoryOffhand");
+  catalog.replaceChildren();storage.replaceChildren();bar.replaceChildren();off.replaceChildren();
   const query=$("inventorySearch").value.trim().toLowerCase();
   const groups={
     building:[3,4,9,10,11,12,15],
@@ -678,6 +687,29 @@ function renderInventory(){
   }
   for(let i=9;i<36;i++)drawSlot(storage,i);
   for(let i=0;i<9;i++)drawSlot(bar,i);
+  const b=inventoryButton(offhandBlock,36,"slot");
+  b.addEventListener("click",()=>{
+    const prev=offhandBlock;offhandBlock=heldItem;setHeldItem(prev);
+    saveInventory();renderInventory();renderHotbar();
+  });
+  b.addEventListener("contextmenu",e=>{
+    e.preventDefault();
+    if(heldItem)offhandBlock=heldItem;
+    else if(offhandBlock)setHeldItem(offhandBlock);
+    saveInventory();renderInventory();renderHotbar();
+  });
+  b.addEventListener("dragover",e=>e.preventDefault());
+  b.addEventListener("drop",e=>{
+    e.preventDefault();
+    const [kind,val]=(e.dataTransfer?.getData("text/plain")||"").split(":");
+    if(kind==="catalog")offhandBlock=Number(val);
+    else if(kind==="slot"){
+      const i=Number(val),previous=offhandBlock;
+      offhandBlock=inventorySlots[i];inventorySlots[i]=previous;
+    }
+    saveInventory();renderInventory();renderHotbar();
+  });
+  off.appendChild(b);
 }
 function openInventory(){
   if(!playing||paused||menuVisible||inventoryOpen)return;
@@ -780,6 +812,7 @@ function connectControls(){
   $("seedInput").addEventListener("change",()=>switchWorld(Number($("seedInput").value),true));
   $("pauseButton").addEventListener("click",pause);
   $("inventoryButton").addEventListener("click",toggleInventory);
+  $("offhandHud").addEventListener("click",()=>{if(playing&&!paused)toggleInventory();});
   $("touch-inventory").addEventListener("click",toggleInventory);
   $("closeInventory").addEventListener("click",closeInventory);
   $("inventorySearch").addEventListener("input",renderInventory);
@@ -829,9 +862,11 @@ function connectControls(){
       }else lastSpaceTap=now;
     }
     if(e.code==="KeyF"&&!e.repeat){
-      // A convenient accessibility fallback for flight; double Space is standard.
-      game.set_flying(!game.flying());
-      toast(game.flying()?"FLIGHT ENABLED":"FLIGHT DISABLED");
+      const previous=offhandBlock;
+      offhandBlock=inventorySlots[selected];
+      inventorySlots[selected]=previous;
+      saveInventory();renderHotbar();
+      toast("SWAPPED OFFHAND");
     }
   });
   addEventListener("keyup",e=>held.delete(e.code));
