@@ -124,8 +124,8 @@ void main(){
   vec3 p=vPos-vNorm*.001;
   vec3 color=palette(vMat,vNorm,p);
   float gran=hash3(floor(vPos*4.0)+vec3(2.1))*2.-1.;
-  float patch=hash3(floor(vPos*1.22))*2.-1.;
-  color*=1.+gran*.075+patch*.075;
+  float detailNoise=hash3(floor(vPos*1.22))*2.-1.;
+  color*=1.+gran*.075+detailNoise*.075;
   // Lighting is oriented by the mesher, with subtle ambient occlusion.
   color *= mix(.38,1.,uDay) * vBright + (1.-uDay)*.035;
   if(vMat>12.5&&vMat<13.5)color += vec3(.36,.28,.08);
@@ -173,7 +173,7 @@ void main(){
  col=mix(col,vec3(.90,.94,.91)*(.60+uDay*.4),cloud*.31*uDay);
  float sun=length((uv-vec2(.74,.72))*vec2(uResolution.x/uResolution.y,1.));
  col+=vec3(1.,.69,.30)*exp(-sun*17.)*.20*uDay;
- col+=vec3(1.,.91,.66)*smoothstep(.032,.023,sun)*.7*uDay;
+ col+=vec3(1.,.91,.66)*(1.-smoothstep(.023,.032,sun))*.7*uDay;
  if(uDay<.35){
    float stars=step(.998,hash(floor(uv*uResolution*.55)));
    col+=vec3(.8,.86,1.)*stars*(.35-uDay)*1.4;
