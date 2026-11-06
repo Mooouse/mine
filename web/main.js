@@ -394,6 +394,16 @@ function initGL(){
   lineProgram=createProgram(lineVS,lineFS);
   vaoSky=gl.createVertexArray();
   vaoLine=gl.createVertexArray();
+  botVao=gl.createVertexArray();
+  botVbo=gl.createBuffer();
+  gl.bindVertexArray(botVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER,botVbo);
+  gl.bufferData(gl.ARRAY_BUFFER,60000,gl.DYNAMIC_DRAW);
+  for(const [loc,size,offset] of [[0,3,0],[1,3,12],[2,1,24],[3,1,28]]){
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,size,gl.FLOAT,false,32,offset);
+  }
+  gl.bindVertexArray(null);
   vboLine=gl.createBuffer();
   gl.bindVertexArray(vaoLine);
   gl.bindBuffer(gl.ARRAY_BUFFER,vboLine);
@@ -587,6 +597,46 @@ function multiply(a,b){
   return out;
 }
 function skyColor(day){return [.045+day*.625,.067+day*.74,.12+day*.75];}
+function botBox(buffer,bot,x,y,z,sx,sy,sz,mat){
+  const swing=Math.sin(bot.step)*.07;
+  // Rotate each limb about the avatar's central vertical axis.
+  const ca=Math.cos(bot.heading),sa=Math.sin(bot.heading);
+  for(const face of FACES){
+    for(const idx of TRI){
+      const p=face.c[idx];
+      const lx=x+(p[0]-.5)*sx;
+      const ly=y+p[1]*sy;
+      const lz=z+(p[2]-.5)*sz;
+      const nx=bot.x+lx*ca-lz*sa;
+      const nz=bot.z+lx*sa+lz*ca;
+      const n=face.n;
+      buffer.push(nx,bot.y+ly,nz,n[0]*ca-n[2]*sa,n[1],n[0]*sa+n[2]*ca,mat,face.light);
+    }
+  }
+}
+function drawMiniBots(){
+  if(!minigames?.active||!botVao)return;
+  const bots=minigames.getBots();
+  if(!bots.length)return;
+  const vertices=[];
+  for(const b of bots){
+    const sway=Math.sin(b.step)*.09;
+    // Boots, legs, torso, articulated sleeves, head and little eyes.
+    botBox(vertices,b,-.19,.06+sway,0,.22,.68,.31,12);
+    botBox(vertices,b,.19,.06-sway,0,.22,.68,.31,12);
+    botBox(vertices,b,0,.74,0,.63,.68,.37,b.color);
+    botBox(vertices,b,-.45,.75-sway,0,.20,.61,.31,b.color);
+    botBox(vertices,b,.45,.75+sway,0,.20,.61,.31,b.color);
+    botBox(vertices,b,0,1.41,0,.56,.55,.52,4);
+    botBox(vertices,b,0,1.91,0,.58,.105,.55,b.id%2?28:12);
+    botBox(vertices,b,-.13,1.73,-.274,.08,.08,.03,12);
+    botBox(vertices,b,.13,1.73,-.274,.08,.08,.03,12);
+  }
+  gl.bindVertexArray(botVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER,botVbo);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);
+  gl.drawArrays(gl.TRIANGLES,0,vertices.length/8);
+}
 function drawSelection(vp,coord){
   if(!coord || coord.length!==7)return;
   const [x,y,z]=coord,eps=.003;
@@ -644,6 +694,10 @@ function render(time){
     if(!m.solid)continue;
     gl.bindVertexArray(m.solid.vao);
     gl.drawArrays(gl.TRIANGLES,0,m.solid.count);
+  }
+  if(minigames?.active){
+    drawMiniBots();
+    minigames.updateTags(vp,canvas.clientWidth,canvas.clientHeight);
   }
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
