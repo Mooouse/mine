@@ -158,13 +158,23 @@ void main(){
   // Lighting is oriented by the mesher, with subtle ambient occlusion.
   color *= mix(.38,1.,uDay) * vBright + (1.-uDay)*.035;
   if(vMat>12.5&&vMat<13.5)color += vec3(.36,.28,.08);
-  if(vMat>7.5&&vMat<8.5)color = mix(color,vec3(.32,.72,.91),.17);
+  if(vMat>7.5&&vMat<8.5){
+    float waveA=sin(vPos.x*2.2+vPos.z*.8+uTime*.0019);
+    float waveB=sin(vPos.z*2.9-vPos.x*.65-uTime*.0015);
+    float ripples=(waveA+waveB)*.5;
+    float viewAngle=clamp(dot(normalize(uCam-vPos),normalize(vNorm)),0.,1.);
+    float fresnel=pow(1.-viewAngle,3.);
+    color=mix(vec3(.045,.26,.38),vec3(.16,.58,.74),.53+ripples*.13);
+    color+=vec3(.14,.20,.21)*fresnel*uDay;
+    float glint=pow(max(0.,ripples),12.)*.13*uDay*max(vNorm.y,0.);
+    color+=vec3(glint);
+  }
   if(vMat>9.5&&vMat<10.5)color = mix(color,vec3(.74,.91,.93),.42);
   float distanceToCamera=length(vPos-uCam);
   float fog=smoothstep(uFogStart,uFogStart+40.,distanceToCamera);
   color=mix(color,uFog,fog*.94);
   float alpha=1.;
-  if(vMat>7.5&&vMat<8.5)alpha=.76;
+  if(vMat>7.5&&vMat<8.5)alpha=.68;
   if(vMat>9.5&&vMat<10.5)alpha=.5;
   outColor=vec4(color,alpha);
 }`;
@@ -178,36 +188,75 @@ const skyFS = `#version 300 es
 precision highp float;
 uniform vec2 uResolution;
 uniform vec2 uLook;
+uniform vec2 uCameraXZ;
 uniform float uDay;
 uniform float uTime;
+uniform float uCycle;
 out vec4 outColor;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.545);}
-float noise(vec2 p){
- vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
- return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
-            mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+
+float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}
+float valueNoise(vec2 p){
+  vec2 i=floor(p),f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  return mix(mix(h2(i),h2(i+vec2(1.0,0.0)),f.x),
+             mix(h2(i+vec2(0.0,1.0)),h2(i+vec2(1.0,1.0)),f.x),f.y);
+}
+float clouds(vec2 p){
+  float v=valueNoise(p)*.56;
+  v+=valueNoise(p*2.06+3.6)*.29;
+  v+=valueNoise(p*4.27+6.1)*.15;
+  return v;
 }
 void main(){
- vec2 uv=gl_FragCoord.xy/uResolution;
- float h=clamp((uv.y-.40)+uLook.y*.36,-.4,1.2);
- vec3 night=vec3(.035,.07,.14);
- vec3 horizon=vec3(.69,.85,.83);
- vec3 zenith=vec3(.15,.42,.67);
- vec3 day=mix(horizon,zenith,smoothstep(.05,.95,h));
- vec3 col=mix(night,day,uDay);
- float cloudMask=smoothstep(.12,.72,h);
- vec2 c=vec2((uv.x+uLook.x*.08)*5.+uTime*.0009, (uv.y+uLook.y*.1)*4.);
- float cn=noise(c*2.3)*.56+noise(c*5.1)*.31+noise(c*10.7)*.13;
- float cloud=smoothstep(.55,.77,cn)*cloudMask;
- col=mix(col,vec3(.90,.94,.91)*(.60+uDay*.4),cloud*.31*uDay);
- float sun=length((uv-vec2(.74,.72))*vec2(uResolution.x/uResolution.y,1.));
- col+=vec3(1.,.69,.30)*exp(-sun*17.)*.20*uDay;
- col+=vec3(1.,.91,.66)*(1.-smoothstep(.023,.032,sun))*.7*uDay;
- if(uDay<.35){
-   float stars=step(.998,hash(floor(uv*uResolution*.55)));
-   col+=vec3(.8,.86,1.)*stars*(.35-uDay)*1.4;
- }
- outColor=vec4(col,1.);
+  vec2 screen=gl_FragCoord.xy/uResolution*2.0-1.0;
+  float y0=uLook.y, a=uLook.x;
+  vec3 forward=vec3(sin(a)*cos(y0),sin(y0),-cos(a)*cos(y0));
+  vec3 right=vec3(cos(a),0.0,sin(a));
+  vec3 upward=vec3(-sin(a)*sin(y0),cos(y0),cos(a)*sin(y0));
+  float aspect=uResolution.x/uResolution.y;
+  vec3 ray=normalize(forward+right*(screen.x*aspect*.70)+upward*(screen.y*.70));
+
+  float elevation=clamp(ray.y,-.15,1.0);
+  float horizon=pow(1.0-clamp(elevation*1.8,0.0,1.0),3.0);
+  vec3 blueHorizon=vec3(.67,.81,.87);
+  vec3 blueZenith=vec3(.105,.31,.62);
+  vec3 blue=mix(blueHorizon,blueZenith,smoothstep(-.08,.85,elevation));
+  vec3 night=mix(vec3(.045,.067,.12),vec3(.005,.017,.052),smoothstep(-.1,.8,elevation));
+  vec3 sky=mix(night,blue,smoothstep(.0,.32,uDay));
+  float phase=uCycle*6.28318530718/1200.0;
+  vec3 sunDir=normalize(vec3(.56,sin(phase),-.76));
+  vec3 moonDir=-sunDir;
+  float sunDot=dot(ray,sunDir);
+  float moonDot=dot(ray,moonDir);
+  float warm=(1.0-smoothstep(.0,.43,sunDir.y))*uDay;
+  sky+=vec3(1.0,.40,.14)*warm*horizon*.36;
+  float glare=exp(-max(0.0,1.0-sunDot)*24.0)*uDay;
+  sky+=vec3(1.0,.72,.37)*glare*.26;
+  float sunDisk=1.0-smoothstep(.00010,.00029,1.0-sunDot);
+  sky=mix(sky,vec3(1.0,.97,.76),sunDisk*uDay);
+  float moonDisk=1.0-smoothstep(.00008,.00025,1.0-moonDot);
+  sky=mix(sky,vec3(.74,.82,.93),moonDisk*(1.0-uDay));
+
+  float starNight=1.0-smoothstep(.03,.32,uDay);
+  if(starNight>.01 && ray.y>-.04){
+    vec3 cell=floor(ray*355.0);
+    float star=h2(cell.xy+vec2(cell.z*15.17,cell.z*9.91));
+    star=step(.997,star)*(.65+.35*h2(cell.yz));
+    sky+=vec3(.76,.86,1.0)*star*starNight;
+  }
+
+  if(ray.y>.055){
+    float layer=155.0/max(ray.y,.11);
+    vec2 cloudUV=(uCameraXZ+ray.xz*layer)*.0085;
+    cloudUV+=vec2(uTime*.0000018,uTime*.0000006);
+    float density=clouds(cloudUV);
+    float coverage=smoothstep(.49,.71,density);
+    float fade=smoothstep(.04,.19,ray.y)*smoothstep(.03,.35,uDay);
+    vec3 cloudWhite=mix(vec3(.32,.39,.49),vec3(.98,.98,.95),clamp(uDay+.12,0.0,1.0));
+    cloudWhite+=vec3(.16,.08,.02)*warm;
+    sky=mix(sky,cloudWhite,coverage*fade*.86);
+  }
+  outColor=vec4(max(sky,vec3(.0)),1.0);
 }`;
 const lineVS = `#version 300 es
 precision highp float;
@@ -412,7 +461,7 @@ function multiply(a,b){
     out[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
   return out;
 }
-function skyColor(day){return [.038+day*.59,.07+day*.73,.14+day*.70];}
+function skyColor(day){return [.045+day*.625,.067+day*.74,.12+day*.75];}
 function drawSelection(vp,coord){
   if(!coord || coord.length!==7)return;
   const [x,y,z]=coord,eps=.003;
@@ -443,7 +492,7 @@ function render(time){
   const proj=perspective(70*Math.PI/180,canvas.width/canvas.height,.055,Math.max(160,renderDistance*16+72));
   const vp=multiply(proj,lookAt(eye,forward));
   glState.vp=vp;glState.camera=eye;
-  const day=clamp(.35+Math.sin(game.time()/1200*Math.PI*2)*.85,.15,1);
+  const day=clamp(.42+Math.sin(game.time()/1200*Math.PI*2)*.67,0,1);
   const fog=skyColor(day);
   gl.clearColor(...fog,1);
   gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
@@ -453,6 +502,8 @@ function render(time){
   gl.uniform2f(gl.getUniformLocation(skyProgram,"uLook"),yaw,pitch);
   gl.uniform1f(gl.getUniformLocation(skyProgram,"uDay"),day);
   gl.uniform1f(gl.getUniformLocation(skyProgram,"uTime"),time);
+  gl.uniform1f(gl.getUniformLocation(skyProgram,"uCycle"),game.time());
+  gl.uniform2f(gl.getUniformLocation(skyProgram,"uCameraXZ"),cx,cz);
   gl.bindVertexArray(vaoSky);
   gl.drawArrays(gl.TRIANGLES,0,3);
   gl.enable(gl.DEPTH_TEST);
