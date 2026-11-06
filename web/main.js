@@ -1,4 +1,5 @@
 import init, { Game } from "./pkg/mine_web.js";
+import {MiniGames} from "./minigames.js";
 
 // MINE web client. World generation, physics, edits and saves are all Rust/WASM.
 // Only browser input, HTML controls and GPU drawing live in JavaScript.
@@ -61,6 +62,7 @@ const CHUNK=16, WORLD_HEIGHT=64;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let game,gl,worldProgram,skyProgram,lineProgram,vaoSky,vaoLine,vboLine;
 let playing=false, paused=false, menuVisible=true, selected=0;
+let minigames=null,botVao=null,botVbo=null;
 let yaw=.24,pitch=-.13,sensitivity=1, fov=75, soundEnabled=true, debugVisible=false, renderDistance=3, target=[], player=[8,34,8], seed=42042;
 let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
@@ -673,6 +675,10 @@ function getTarget(){
 }
 function action(place=false){
   if(!playing||paused||menuVisible||inventoryOpen)return;
+  if(minigames?.active){
+    minigames.action(place,getLook());
+    return;
+  }
   const found=getTarget();
   if(found.length!==7)return;
   const [x,y,z,tx,ty,tz,id]=found;
@@ -885,7 +891,7 @@ function renderHUD(){
   $("compass").innerHTML=dirs[Math.round(degrees/45)%8]+' <span>•</span> '+String(Math.round(degrees)).padStart(3,"0")+'°';
 }
 function save(){
-  if(!game)return;
+  if(!game||minigames?.active)return;
   try {
     localStorage.setItem("mine_world_"+seed,game.export_save());
     localStorage.setItem("mine_last_seed",String(seed));
@@ -917,12 +923,21 @@ function start(){
   $("hud").classList.remove("hidden");
   if(isMobile)$("mobile-controls").classList.remove("hidden");
   else canvas.requestPointerLock?.().catch(()=>{});
-  showHelp();
-  showSelectedName();
+  if(!minigames?.active){
+    showHelp();showSelectedName();
+  }else {
+    $("hud").classList.remove("help-visible");
+    $("itemToast").classList.add("hidden");
+  }
 }
 function pause(){
   if(!playing || paused || inventoryOpen)return;
-  paused=true;leftHeld=false;rightHeld=false;save();
+  paused=true;leftHeld=false;rightHeld=false;
+  if(!minigames?.active)save();
+  $("pauseTitle").textContent=minigames?.active?"Game paused":"Game menu";
+  $("pauseDescription").textContent=minigames?.active?
+    "Mini-game paused · bot opponents are offline AI.":"Your world is saved automatically.";
+  $("saveButton").classList.toggle("hidden",!!minigames?.active);
   $("pause").classList.remove("hidden");
   document.exitPointerLock?.();
 }
@@ -933,6 +948,7 @@ function resume(){
   if(!isMobile)canvas.requestPointerLock?.().catch(()=>{});
 }
 function returnMenu(){
+  if(minigames?.active){minigames.leave(false);return;}
   if(inventoryOpen)closeInventory();
   save();paused=false;playing=false;menuVisible=true;
   $("menu").classList.remove("hidden");
@@ -957,9 +973,13 @@ function connectControls(){
   });
   $("seedInput").addEventListener("change",()=>switchWorld(Number($("seedInput").value),true));
   $("pauseButton").addEventListener("click",pause);
-  $("inventoryButton").addEventListener("click",toggleInventory);
+  $("inventoryButton").addEventListener("click",()=>{
+    if(minigames?.active)minigames.showRules();else toggleInventory();
+  });
   $("offhandHud").addEventListener("click",()=>{if(playing&&!paused)toggleInventory();});
-  $("touch-inventory").addEventListener("click",toggleInventory);
+  $("touch-inventory").addEventListener("click",()=>{
+    if(minigames?.active)minigames.showRules();else toggleInventory();
+  });
   $("closeInventory").addEventListener("click",closeInventory);
   $("inventorySearch").addEventListener("input",renderInventory);
   $("inventoryTabs").addEventListener("click",e=>{
@@ -990,6 +1010,12 @@ function connectControls(){
   addEventListener("keydown",e=>{
     if(["Space","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)&&playing)e.preventDefault();
     if(e.code==="Escape"){
+      if(!$("miniLobby").classList.contains("hidden")){
+        minigames?.closeLobby();return;
+      }
+      if(!$("miniResult").classList.contains("hidden")){
+        minigames?.leave(true);return;
+      }
       if(inventoryOpen)closeInventory();
       else if(!menuVisible){if(paused)resume();else pause();}
       return;
@@ -1008,15 +1034,19 @@ function connectControls(){
       renderHUD();return;
     }
     if(e.code==="KeyH"&&!e.repeat){showHelp();return;}
-    if(e.code==="KeyE"&&!e.repeat){toggleInventory();return;}
+    if(e.code==="KeyE"&&!e.repeat){
+      if(minigames?.active)minigames.showRules();
+      else toggleInventory();
+      return;
+    }
     if(inventoryOpen)return;
     held.add(e.code);
-    if(e.code==="KeyQ"&&!e.repeat) {
+    if(e.code==="KeyQ"&&!e.repeat && !minigames?.active) {
       // Creative mode: clear selected hotbar slot (no spawned dropped entity).
       inventorySlots[selected]=0;saveInventory();renderHotbar();showSelectedName();
     }
     if(/^Digit[1-9]$/.test(e.code))setSelected(Number(e.code.slice(5))-1);
-    if(e.code==="Space"&&!e.repeat){
+    if(e.code==="Space"&&!e.repeat&&!minigames?.active){
       const now=performance.now();
       if(now-lastSpaceTap<330){
         game.set_flying(!game.flying());
@@ -1024,7 +1054,7 @@ function connectControls(){
         lastSpaceTap=-1000;
       }else lastSpaceTap=now;
     }
-    if(e.code==="KeyF"&&!e.repeat){
+    if(e.code==="KeyF"&&!e.repeat&&!minigames?.active){
       const previous=offhandBlock;
       offhandBlock=inventorySlots[selected];
       inventorySlots[selected]=previous;
@@ -1044,7 +1074,7 @@ function connectControls(){
     if(document.pointerLockElement!==canvas){canvas.requestPointerLock?.().catch(()=>{});return;}
     if(e.button===0){leftHeld=true;action(false);mouseLastAction=performance.now();}
     if(e.button===2){rightHeld=true;action(true);mouseLastAction=performance.now();}
-    if(e.button===1){
+    if(e.button===1&&!minigames?.active){
       // Minecraft-style creative pick block.
       const hit=getTarget();
       if(hit.length===7){
@@ -1062,7 +1092,7 @@ function connectControls(){
   canvas.addEventListener("wheel",e=>{
     if(!playing||paused||inventoryOpen)return;
     e.preventDefault();
-    setSelected(selected+(e.deltaY>0?1:-1));
+    if(!minigames?.active)setSelected(selected+(e.deltaY>0?1:-1));
   },{passive:false});
   document.addEventListener("pointerlockchange",()=>{
     if(!isMobile&&playing&&!menuVisible&&!paused&&!inventoryOpen&&
@@ -1115,9 +1145,16 @@ function simulation(dt,time){
   const sneak=held.has("ShiftLeft")||held.has("ShiftRight");
   const down=game.flying()&&sneak?1:0;
   crouchBlend+=(Number(sneak&&!game.flying())-crouchBlend)*Math.min(1,dt*11);
+  if(minigames?.active&&minigames.phase==="ready"){
+    minigames.tick(dt);return;
+  }
   game.step(dt,mx,mz,jump,held.has("ControlLeft")||held.has("ControlRight"),down,sneak&&!game.flying());
   player=game.player();
-  target=getTarget();
+  if(minigames?.active){
+    minigames.tick(dt);
+    player=game.player();
+    target=[];
+  }else target=getTarget();
   if((leftHeld||rightHeld||MOBILE_ACTIONS.break||MOBILE_ACTIONS.place)&&time-mouseLastAction>210) {
     action(rightHeld||MOBILE_ACTIONS.place);
     mouseLastAction=time;
@@ -1129,12 +1166,16 @@ function frameLoop(time){
   if(frameAccumulator>.42){fps=frame/frameAccumulator;frame=0;frameAccumulator=0;}
   if(playing&&!paused&&!inventoryOpen)simulation(dt,time);
   else player=game.player();
-  if(playing&&!paused)advanceWater(time);
+  if(playing&&!paused&&!minigames?.active)advanceWater(time);
+  if(minigames?.active)minigames.flushDirty();
   rebuildWaterMeshes();
   updateVisibleChunks();
   render(time);
   if(playing&&!paused&&!inventoryOpen&&Math.floor(time/180)%2===0)renderHUD();
-  if(time-lastAutosave>5000){if(playing&&!paused)save();lastAutosave=time;}
+  if(time-lastAutosave>5000){
+    if(playing&&!paused&&!minigames?.active)save();
+    lastAutosave=time;
+  }
   requestAnimationFrame(frameLoop);
 }
 async function main(){
@@ -1153,6 +1194,25 @@ async function main(){
     loadInventory(false);
     initGL();
     renderHotbar();
+    minigames=new MiniGames({
+      game:()=>game,player:()=>player,
+      syncPlayer:()=>{player=game.player();},
+      toast,sound:soundEffect,
+      enterArena:enterMinigameWorld,
+      exitArena:exitMinigameWorld,
+      startRound:start,
+      stopRound:()=>{paused=false;playing=false;leftHeld=false;rightHeld=false;},
+      finishRound:()=>{
+        paused=true;leftHeld=false;rightHeld=false;held.clear();
+        document.exitPointerLock?.();
+      },
+      rebuildArenaChunk:rebuildArenaChunk,
+      knockPlayer:(dx,dz)=>{
+        const p=game.player();
+        game.teleport(p[0]+dx,p[1]+.15,p[2]+dz);
+        player=game.player();
+      }
+    });
     connectControls();
     renderDistance=Number(localStorage.getItem("mine_distance"))||3;
     renderDistance=clamp(renderDistance,2,5);
