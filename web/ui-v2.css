@@ -491,3 +491,21 @@ button{touch-action:manipulation}
   .touch-button{height:40px;font-size:16px}
   .item-toast{bottom:48px}
 }
+
+/* Tiny block fragments on creative mining; bounded, self-removing elements. */
+#particles{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:5}
+.debris{
+  display:block;position:absolute;width:8px;height:8px;
+  border:1px solid #0004;
+  box-shadow:inset 1px 1px 0 #fff3,1px 1px 3px #0005;
+  animation:debris-puff .42s cubic-bezier(.12,.54,.28,1) both;
+  will-change:transform,opacity;
+}
+@keyframes debris-puff{
+  0%{transform:translate(-50%,-50%) scale(.65);opacity:.9}
+  78%{opacity:.8}
+  100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--rot)) scale(.42);opacity:0}
+}
+@media(hover:none) and (pointer:coarse){
+  .hud.help-visible .tips{display:none}
+}
