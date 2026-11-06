@@ -19,7 +19,13 @@ page.on("console",m=>{ if(m.type()==="error")errors.push(m.text()); });
 
 try{
   await page.goto(url,{waitUntil:"domcontentloaded",timeout:30000});
-  await page.locator("#loading").waitFor({state:"detached",timeout:45000});
+  try {
+    await page.locator("#loading").waitFor({state:"detached",timeout:18000});
+  } catch(e) {
+    console.error("LOADING STATUS:", await page.locator("#loading-message").textContent());
+    console.error("BROWSER ERRORS:", errors.join(" | "));
+    throw e;
+  }
   if(!await page.locator("#menu").isVisible())throw new Error("Main menu did not appear");
   const dimensions=await page.locator("#game").evaluate(el=>[el.width,el.height]);
   if(dimensions[0]<100||dimensions[1]<100)throw new Error("Game canvas is empty");
