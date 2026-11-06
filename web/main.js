@@ -348,6 +348,13 @@ function facesMesh(cx,cz){
           if(watery){
             exposed=!isWater(next) && (next===0||next===14||next===10);
             if(face.d[1]===1)exposed=!isWater(next);
+            // A visible lip where one flowing cell is deeper than its neighbor.
+            if(!exposed&&face.d[1]===0&&isWater(next)){
+              const hh=waterHeight(next,isWater(blockAt(wx+face.d[0],y+1,wz+face.d[2])));
+              if(h-hh>.025){
+                addFace(buf,wx,y+hh,wz,id,face,h-hh);
+              }
+            }
           }else if(id===10)exposed=next!==10;
           else exposed=next===0 || isWater(next) || next===10 || next===14;
           if(exposed)addFace(buf,wx,y,wz,id,face,h);
