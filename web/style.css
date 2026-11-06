@@ -120,6 +120,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .topbar{padding:8px 14px}
   .compass{top:58px}
 }
+@media(hover:none) and (pointer:coarse) and (orientation:portrait){
+  .joystick{bottom:128px;left:17px;width:105px;height:105px}
+  .mobile-right{bottom:117px;right:12px}
+  .hud-footer{bottom:env(safe-area-inset-bottom,4px)}
+}
 @media(hover:none) and (pointer:coarse){
   .hotbar{max-width:calc(100vw - 8px)}
   .hud-footer{bottom:env(safe-area-inset-bottom,4px)}
