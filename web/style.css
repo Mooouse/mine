@@ -129,3 +129,74 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .hotbar{max-width:calc(100vw - 8px)}
   .hud-footer{bottom:env(safe-area-inset-bottom,4px)}
 }
+
+
+/* Inventory: original voxel-themed creative interface, 9-wide Minecraft-style grids. */
+.inventory-overlay{position:fixed;inset:0;z-index:21;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,12,16,.66);backdrop-filter:blur(8px);pointer-events:auto;touch-action:pan-y}
+.inv-window{width:min(880px,100%);max-height:calc(100dvh - 34px);overflow:auto;padding:26px 30px 16px;border:1px solid #a5b8a7;border-radius:12px;background:linear-gradient(153deg,#26342f,#152322 80%);box-shadow:inset 0 1px 0 #77908288,0 35px 100px #000b;scrollbar-color:#728d7a #172725;touch-action:pan-y}
+.inv-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:17px;border-bottom:1px solid #78947d5b}
+.inv-header h2{font-weight:700;letter-spacing:-.06em;font-size:clamp(29px,4vw,40px);line-height:1;margin:7px 0 0}
+.inv-kicker{color:var(--green);font:700 10px var(--font);letter-spacing:.19em}
+.inv-close{height:35px;width:35px;border:1px solid #738c80;border-radius:7px;background:#2e423d;color:#eaffea;font-size:25px;line-height:1}
+.inv-close:hover{background:#557264}
+.inv-columns{display:grid;grid-template-columns:1.05fr 1fr;gap:28px;margin-top:19px}
+.inv-section-title{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.12em;margin-bottom:12px;color:#f1ffeb}
+.inv-section-title span{font-size:9px;letter-spacing:.05em;color:#aac0ae}
+.inv-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.inv-tabs button{border:1px solid #5b7061;background:#1c2d2a;color:#a4b8ad;padding:7px 9px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.055em}
+.inv-tabs button.active,.inv-tabs button:hover{background:#c5ff8b;color:#172920;border-color:#c5ff8b}
+#inventorySearch{width:100%;height:34px;outline:0;border:1px solid #637d6e;background:#0c1b1b;color:#e7ffe4;padding:8px 11px;border-radius:5px;font-size:12px;margin:0 0 11px}
+#inventorySearch:focus{border-color:#c5ff8b}
+.inv-catalog-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;min-height:90px}
+.inv-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
+.inv-storage-grid{padding-bottom:17px;border-bottom:1px solid #657a7040}
+.inv-hotbar-title{margin-top:16px}
+.inv-slot{position:relative;min-width:0;aspect-ratio:1;min-height:35px;display:flex;justify-content:center;align-items:center;flex-direction:column;background:#101c1b;border:1px solid #52685b;border-radius:3px;color:#e3f5df;cursor:pointer;user-select:none;touch-action:manipulation}
+.inv-slot:hover,.inv-slot:focus-visible{background:#263b34;border-color:#d0ffa3;z-index:1}
+.inv-slot.active{box-shadow:inset 0 0 0 2px #c5ff8b}
+.inv-slot.cursor-pick{outline:2px dashed #c5ff8b;outline-offset:-3px}
+.inv-catalog-grid .inv-slot{background:#23352f}
+.inv-catalog-grid .inv-slot:hover{background:#395446}
+.inv-slot:disabled{opacity:.25;cursor:default}
+.inv-slot .cube{width:19px;height:19px;transform:rotate(-30deg) skew(7deg,7deg);box-shadow:inset -5px -3px 0 #0004,inset 3px 3px 0 #fff3,2px 3px 4px #0005;border:1px solid #0003;pointer-events:none}
+.inv-slot .small-num{position:absolute;top:2px;left:4px;color:#b2c4b0;font-size:8px;pointer-events:none}
+.inv-slot.empty{opacity:.7}
+.inv-slot.empty:hover{opacity:1}
+.inv-hint{min-height:34px;padding-top:12px;color:#97b3a5;font-size:10px;line-height:1.4}
+.inv-clear{border:1px solid #5b7567;border-radius:4px;background:#20342f;color:#b2cfb8;padding:8px 10px;font-size:9px;letter-spacing:.07em;margin-top:10px}
+.inv-clear:hover{color:#fff;background:#345247}
+.inv-bottom{display:flex;justify-content:space-between;border-top:1px solid #78947d5b;margin-top:12px;padding-top:13px;font-size:9px;color:#a4bbaa;font-weight:700;letter-spacing:.09em}
+.inv-bottom kbd{border:1px solid #718979;border-radius:3px;padding:2px 5px;color:#e9ffea}
+.cursor-item{position:fixed;z-index:25;pointer-events:none;transform:translate(9px,9px);width:38px;height:38px;background:#0b191bc9;border:1px solid #b7ec97;border-radius:7px;display:grid;place-items:center}
+.cursor-item .cube{width:21px;height:21px;transform:rotate(-30deg) skew(7deg,7deg);box-shadow:inset -5px -4px #0003,inset 3px 3px #fff3}
+#inventoryButton svg{stroke-width:1.7}
+#mobile-controls .touch-button:active,.touch-button:active{background:#50855eaa}
+@media(max-width:710px){
+  .inventory-overlay{padding:6px}
+  .inv-window{padding:14px;max-height:calc(100dvh - 12px);border-radius:8px}
+  .inv-columns{grid-template-columns:1fr;gap:13px}
+  .inv-header{padding-bottom:9px}
+  .inv-catalog-grid{grid-template-columns:repeat(8,minmax(0,1fr))}
+  .inv-section-title{margin-bottom:7px}
+  .inv-hotbar-title{margin-top:8px}
+  .inv-storage-grid{padding-bottom:8px}
+  .inv-slot{min-height:29px}
+  .inv-slot .cube{width:15px;height:15px}
+  .inv-hint{min-height:0;padding:7px 0;font-size:9px}
+  .inv-bottom{font-size:8px}
+}
+@media(orientation:landscape) and (max-height:540px){
+  .inventory-overlay{padding:5px}
+  .inv-window{padding:9px 13px;max-height:calc(100dvh - 10px)}
+  .inv-header h2{font-size:23px}
+  .inv-header{padding-bottom:5px}
+  .inv-columns{grid-template-columns:1fr 1fr;gap:15px;margin-top:7px}
+  .inv-section-title{font-size:9px;margin-bottom:5px}
+  .inv-slot{min-height:25px}
+  .inv-tabs{margin-bottom:6px}
+  .inv-tabs button{padding:4px}
+  #inventorySearch{height:25px;padding:3px 8px;margin-bottom:5px}
+  .inv-hint{padding:4px 0;font-size:8px}
+  .inv-bottom{margin-top:4px;padding-top:5px}
+  .inv-clear{margin-top:5px}
+}
