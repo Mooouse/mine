@@ -2,7 +2,7 @@
 mod noise;
 
 use noise::Noise;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use wasm_bindgen::prelude::*;
 
 const SIDE: usize = 16;
@@ -21,6 +21,9 @@ const SNOW: u8 = 7;
 const WATER: u8 = 8;
 const FLOWER: u8 = 14;
 const CACTUS: u8 = 16;
+// 8 = source water, 17..=23 = progressively weaker flow, 24 = waterfall.
+#[inline]
+fn is_water(v: u8) -> bool { v == WATER || (17..=24).contains(&v) }
 
 #[inline]
 fn idx(x: usize, y: usize, z: usize) -> usize {
@@ -48,6 +51,9 @@ pub struct Game {
     noise: Noise,
     chunks: HashMap<i64, Vec<u8>>,
     edits: HashMap<(i32,i32,i32),u8>,
+    flow_queue: VecDeque<(i32,i32,i32)>,
+    flow_pending: HashSet<(i32,i32,i32)>,
+    flow_dirty: HashSet<(i32,i32)>,
     px:f32, py:f32, pz:f32,
     vx:f32, vy:f32, vz:f32,
     grounded:bool,
@@ -63,6 +69,8 @@ impl Game {
         let mut game = Game {
             seed, noise: Noise::new(seed), chunks: HashMap::new(),
             edits: HashMap::new(),
+            flow_queue: VecDeque::new(), flow_pending: HashSet::new(),
+            flow_dirty: HashSet::new(),
             px:8.5, py:34.0, pz:8.5,
             vx:0.0, vy:0.0, vz:0.0,
             grounded:false, flying:false, time:90.0,
@@ -194,7 +202,7 @@ impl Game {
     }
 
     pub fn set_block(&mut self,x:i32,y:i32,z:i32,value:u8) -> bool {
-        if y <= 0 || y >= HEIGHT as i32 || value > 16 { return false; }
+        if y <= 0 || y >= HEIGHT as i32 || value > 24 { return false; }
         let prev = self.block(x,y,z);
         if prev == value { return false; }
         let cx=x.div_euclid(SIDE as i32);
@@ -204,11 +212,82 @@ impl Game {
         let key = chunk_key(cx,cz);
         self.chunks.get_mut(&key).unwrap()[idx(lx,y as usize,lz)] = value;
         self.edits.insert((x,y,z),value);
+        self.enqueue_around(x,y,z);
         true
     }
 
+    fn enqueue(&mut self,x:i32,y:i32,z:i32) {
+        if y<=0 || y>=HEIGHT as i32 || self.flow_pending.len()>45000 { return; }
+        if self.flow_pending.insert((x,y,z)) { self.flow_queue.push_back((x,y,z)); }
+    }
+
+    fn enqueue_around(&mut self,x:i32,y:i32,z:i32) {
+        self.enqueue(x,y,z);
+        for (dx,dy,dz) in [(0,1,0),(0,-1,0),(1,0,0),(-1,0,0),(0,0,1),(0,0,-1)] {
+            self.enqueue(x+dx,y+dy,z+dz);
+        }
+    }
+
+    // Cells are recalculated from their neighbors, so water recedes when its
+    // only source is removed; this is not a one-way flood fill.
+    fn recalculate_water(&mut self,x:i32,y:i32,z:i32) {
+        if y<=0 || y>=HEIGHT as i32 { return; }
+        let old=self.block(x,y,z);
+        if old==WATER || (old!=AIR && old!=FLOWER && !is_water(old)) { return; }
+        let above=self.block(x,y+1,z);
+        let mut desired=if is_water(above) { 24 } else { AIR };
+        if desired==AIR {
+            let mut min_depth=8u8;
+            for (dx,dz) in [(1,0),(-1,0),(0,1),(0,-1)] {
+                let neighbor=self.block(x+dx,y,z+dz);
+                if neighbor==WATER { min_depth=0; break; }
+                if (17..=23).contains(&neighbor) {
+                    min_depth=min_depth.min(neighbor-16);
+                }
+                // A vertical waterfall can flood a neighboring block only at
+                // its landing point; otherwise it does not generate oceans.
+                if neighbor==24 && !matches!(self.block(x+dx,y-1,z+dz),0|14|17..=24) {
+                    min_depth=min_depth.min(6);
+                }
+            }
+            if min_depth<7 { desired=17+min_depth; }
+        }
+        if desired==old { return; }
+        let cx=x.div_euclid(SIDE as i32);
+        let cz=z.div_euclid(SIDE as i32);
+        let lx=x.rem_euclid(SIDE as i32) as usize;
+        let lz=z.rem_euclid(SIDE as i32) as usize;
+        if let Some(chunk)=self.chunks.get_mut(&chunk_key(cx,cz)) {
+            chunk[idx(lx,y as usize,lz)]=desired;
+        }
+        self.edits.insert((x,y,z),desired);
+        self.flow_dirty.insert((cx,cz));
+        if lx==0 { self.flow_dirty.insert((cx-1,cz)); }
+        if lx==15 { self.flow_dirty.insert((cx+1,cz)); }
+        if lz==0 { self.flow_dirty.insert((cx,cz-1)); }
+        if lz==15 { self.flow_dirty.insert((cx,cz+1)); }
+        self.enqueue_around(x,y,z);
+    }
+
+    // Returns unique [chunk_x,chunk_z,...] pairs whose GPU meshes are stale.
+    pub fn tick_water(&mut self, budget: usize) -> Vec<i32> {
+        for _ in 0..budget.min(256) {
+            let Some((x,y,z))=self.flow_queue.pop_front() else { break; };
+            self.flow_pending.remove(&(x,y,z));
+            self.recalculate_water(x,y,z);
+        }
+        let mut dirty=Vec::with_capacity(self.flow_dirty.len()*2);
+        for (cx,cz) in self.flow_dirty.drain() {
+            dirty.push(cx);dirty.push(cz);
+        }
+        dirty
+    }
+
+    pub fn water_pending(&self) -> usize { self.flow_queue.len() }
+
     fn solid(&mut self,x:i32,y:i32,z:i32) -> bool {
-        !matches!(self.block(x,y,z), AIR | WATER | FLOWER)
+        let id=self.block(x,y,z);
+        id!=AIR && id!=FLOWER && !is_water(id)
     }
 
     fn collides(&mut self,x:f32,y:f32,z:f32) -> bool {
@@ -235,8 +314,9 @@ impl Game {
         let mut x=mx; let mut z=mz;
         let len=(x*x+z*z).sqrt();
         if len > 1.0 { x/=len; z/=len; }
+        let in_water=is_water(self.block(self.px.floor() as i32,(self.py+0.6).floor() as i32,self.pz.floor() as i32));
         let speed = if self.flying { if sprint { 16.0 } else { 9.0 } }
-                    else if sprint { 7.2 } else { 4.8 };
+                    else if in_water { 2.7 } else if sprint { 7.2 } else { 4.8 };
         let blend = (dt * if self.grounded || self.flying { 15.0 } else { 5.0 }).min(1.0);
         self.vx += (x*speed-self.vx)*blend;
         self.vz += (z*speed-self.vz)*blend;
@@ -244,8 +324,13 @@ impl Game {
             let vertical = (if jump { 1.0 } else { 0.0 }) - up;
             self.vy += (vertical*speed-self.vy)*blend;
         } else {
-            if self.grounded && jump { self.vy = 8.4; self.grounded = false; }
-            self.vy = (self.vy - 24.0*dt).max(-36.0);
+            if in_water {
+                self.vy=(self.vy-3.1*dt).max(-3.0);
+                if jump { self.vy=(self.vy+18.0*dt).min(3.9); }
+            } else {
+                if self.grounded && jump { self.vy = 8.4; self.grounded = false; }
+                self.vy = (self.vy - 24.0*dt).max(-36.0);
+            }
         }
 
         let nx = self.px + self.vx*dt;
@@ -290,7 +375,7 @@ impl Game {
             let z=(oz+dz*d).floor() as i32;
             if (x,y,z)!=(px,py,pz) { prev=(px,py,pz);px=x;py=y;pz=z; }
             let id=self.block(x,y,z);
-            if id!=AIR && id!=WATER {
+            if id!=AIR && !is_water(id) {
                 return vec![x,y,z,prev.0,prev.1,prev.2,id as i32];
             }
         }
@@ -353,6 +438,36 @@ mod tests {
         assert!(b.import_save(&save));
         assert_eq!(b.block(3,60,3),9);
     }
+    #[test]
+    fn water_spreads_down_and_sideways_and_recedes() {
+        let mut g=Game::new(222);
+        // A sealed stone floor with free space above it.
+        for x in 2..=8 { for z in 2..=8 {
+            g.set_block(x,47,z,3);
+            for y in 48..=54 { g.set_block(x,y,z,0); }
+        }}
+        g.tick_water(256); // exhaust any reactions to excavation
+        g.set_block(5,51,5,WATER);
+        for _ in 0..14 { g.tick_water(256); }
+        assert!(is_water(g.block(5,50,5))); // waterfall
+        assert!(is_water(g.block(6,48,5))); // spreading on floor
+        g.set_block(5,51,5,AIR);
+        for _ in 0..32 { g.tick_water(256); }
+        assert_eq!(g.block(5,50,5),AIR); // drains after source removed
+    }
+
+    #[test]
+    fn flowing_water_survives_save() {
+        let mut g=Game::new(88);
+        g.set_block(6,55,6,WATER);
+        for _ in 0..4 {g.tick_water(200);}
+        let save=g.export_save();
+        let mut b=Game::new(88);
+        assert!(b.import_save(&save));
+        assert_eq!(b.block(6,55,6),WATER);
+        assert!(is_water(b.block(6,54,6)));
+    }
+
     #[test]
     fn negative_chunk_coords_work() {
         let mut a=Game::new(1);
