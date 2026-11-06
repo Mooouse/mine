@@ -28,8 +28,8 @@
     <div id="block-name" class="block-label"></div>
     <div class="target-outline hidden" id="target-box"></div>
     <div class="hud-footer">
-      <div class="tips desktop-only"><span class="key">W A S D</span> move &nbsp; <span class="key">CTRL</span> sprint &nbsp; <span class="key">SHIFT</span> sneak &nbsp; <span class="key">SPACE ×2</span> fly &nbsp; <span class="key">E</span> inventory &nbsp; <span class="key">LMB / RMB</span> break / place</div>
-      <div id="hotbar" class="hotbar"></div>
+      <div class="tips desktop-only"><span class="key">W A S D</span> move &nbsp; <span class="key">CTRL</span> sprint &nbsp; <span class="key">SHIFT</span> sneak &nbsp; <span class="key">SPACE ×2</span> fly &nbsp; <span class="key">E</span> inventory &nbsp; <span class="key">F</span> offhand &nbsp; <span class="key">LMB / RMB</span> break / place</div>
+      <div class="hotbar-wrap"><button id="offhandHud" class="offhand-hud" title="Offhand (F)" aria-label="Offhand"></button><div id="hotbar" class="hotbar"></div></div>
       <div class="mode-text" id="mode">WALK MODE <span>•</span> <span id="block-count">0</span> BLOCKS CHANGED</div>
     </div>
   </div>
@@ -68,6 +68,7 @@
           <div id="storageSlots" class="inv-grid inv-storage-grid"></div>
           <div class="inv-section-title inv-hotbar-title">HOTBAR <span>1–9</span></div>
           <div id="inventoryHotbar" class="inv-grid"></div>
+          <div class="offhand-section"><div class="inv-section-title">OFFHAND <span>PRESS F TO SWAP</span></div><div id="inventoryOffhand"></div></div>
           <div class="inv-hint">Drag items between slots or click to swap them.</div>
           <button id="clearInventory" class="inv-clear">CLEAR INVENTORY</button>
         </section>
