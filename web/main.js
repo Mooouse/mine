@@ -16,8 +16,13 @@ const BLOCKS = [
   {name:"PLANKS",hex:"#cb9a5b"}, {name:"BASALT",hex:"#444d5a"},
   {name:"LUMEN",hex:"#f8d775"}, {name:"FLOWER",hex:"#ef8da6"},
   {name:"CLAY",hex:"#a3a1a4"}, {name:"CACTUS",hex:"#4f9759"},
+  ...Array(8).fill(null), // IDs 17–24: flowing water.
+  {name:"COBBLESTONE",hex:"#7a817c"}, {name:"GRAVEL",hex:"#a0a096"},
+  {name:"MOSS",hex:"#5b8d50"}, {name:"DARK OAK LOG",hex:"#574232"},
+  {name:"COPPER ORE",hex:"#b87e68"}, {name:"GOLD ORE",hex:"#c6a75c"},
+  {name:"RED SAND",hex:"#b86943"}, {name:"GLOWSTONE",hex:"#f5ce83"},
 ];
-const MATERIALS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
+const MATERIALS = [...Array.from({length:16},(_,i)=>i+1),...Array.from({length:8},(_,i)=>i+25)];
 const INITIAL_HOTBAR = [1,2,3,4,5,6,7,9,8];
 const INVENTORY_SIZE=36;
 let inventorySlots=Array.from({length:INVENTORY_SIZE},(_,i)=>INITIAL_HOTBAR[i]||0);
@@ -28,12 +33,12 @@ function loadInventory(reset=false){
     try{
       const stored=JSON.parse(localStorage.getItem("mine_inventory_"+seed));
       if(Array.isArray(stored)&&stored.length===INVENTORY_SIZE){
-        inventorySlots=stored.map(v=>Number.isInteger(v)&&v>=0&&v<=16?v:0);
+        inventorySlots=stored.map(v=>Number.isInteger(v)&&v>=0&&(v<=16||(v>=25&&v<=32))?v:0);
       }
     }catch(e){/* Ignore outdated inventory format. */}
   }
   offhandBlock=reset?0:(Number(localStorage.getItem("mine_offhand_"+seed))||0);
-  if(offhandBlock<0||offhandBlock>16)offhandBlock=0;
+  if(offhandBlock<0||(offhandBlock>16&&offhandBlock<25)||offhandBlock>32)offhandBlock=0;
   selected=clamp(selected,0,8);
   renderHotbar();
 }
@@ -687,9 +692,9 @@ function renderInventory(){
   catalog.replaceChildren();storage.replaceChildren();bar.replaceChildren();off.replaceChildren();
   const query=$("inventorySearch").value.trim().toLowerCase();
   const groups={
-    building:[3,4,9,10,11,12,15],
-    nature:[1,2,5,6,7,8,16],
-    decor:[13,14]
+    building:[3,4,9,10,11,12,15,25,26,27,28,31],
+    nature:[1,2,5,6,7,8,16,29,30],
+    decor:[13,14,32]
   };
   for(const id of MATERIALS){
     if(inventoryFilter!=="all" && !groups[inventoryFilter]?.includes(id))continue;
@@ -745,7 +750,7 @@ function renderHUD(){
   $("fps").textContent=Math.round(fps)+" FPS";
   $("mode").firstChild.textContent=game.flying()?"FLY MODE ":"WALK MODE ";
   $("block-count").textContent=game.edits_count().toLocaleString();
-  $("block-name").textContent=target.length===7?BLOCKS[target[6]>16?8:target[6]]?.name||"BLOCK":"";
+  $("block-name").textContent=target.length===7?BLOCKS[(target[6]>=17&&target[6]<=24)?8:target[6]]?.name||"BLOCK":"";
   const degrees=(yaw*180/Math.PI%360+360)%360;
   const dirs=["N","NE","E","SE","S","SW","W","NW"];
   $("compass").innerHTML=dirs[Math.round(degrees/45)%8]+' <span>•</span> '+String(Math.round(degrees)).padStart(3,"0")+'°';
@@ -896,8 +901,8 @@ function connectControls(){
       // Minecraft-style creative pick block.
       const hit=getTarget();
       if(hit.length===7){
-        const blockId=hit[6]>16?8:hit[6];
-        if(blockId>0&&blockId<=16){
+        const blockId=(hit[6]>=17&&hit[6]<=24)?8:hit[6];
+        if(BLOCKS[blockId]){
           const existing=inventorySlots.indexOf(blockId,0);
           if(existing>=0&&existing<9)setSelected(existing);
           else{inventorySlots[selected]=blockId;saveInventory();renderHotbar();}
