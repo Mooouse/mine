@@ -247,7 +247,7 @@ impl Game {
                 // A vertical waterfall can flood a neighboring block only at
                 // its landing point; otherwise it does not generate oceans.
                 if neighbor==24 && !matches!(self.block(x+dx,y-1,z+dz),0|14|17..=24) {
-                    min_depth=min_depth.min(6);
+                    min_depth=min_depth.min(0);
                 }
             }
             if min_depth<7 { desired=17+min_depth; }
