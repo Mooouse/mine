@@ -54,10 +54,13 @@ jobs:
           cp -r dist/. /tmp/mine-static/
           cd /tmp/mine-static
           touch .nojekyll
+          test -s pkg/mine_web.js
+          test -s pkg/mine_web_bg.wasm
           git init -b site
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          # wasm-pack ships an internal .gitignore; force-add the Rust binaries.
+          git add --force --all
           git commit -m "Browser build of ${GITHUB_SHA}"
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/site
           echo "Static build: https://raw.githack.com/${GITHUB_REPOSITORY}/site/index.html"
