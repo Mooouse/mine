@@ -21,6 +21,15 @@ const SNOW: u8 = 7;
 const WATER: u8 = 8;
 const FLOWER: u8 = 14;
 const CACTUS: u8 = 16;
+// 17..=24 are water states. Original creative materials start at 25.
+const COBBLE: u8 = 25;
+const GRAVEL: u8 = 26;
+const MOSS: u8 = 27;
+const DARK_LOG: u8 = 28;
+const COPPER: u8 = 29;
+const GOLD: u8 = 30;
+const RED_SAND: u8 = 31;
+const GLOWSTONE: u8 = 32;
 // 8 = source water, 17..=23 = progressively weaker flow, 24 = waterfall.
 #[inline]
 fn is_water(v: u8) -> bool { v == WATER || (17..=24).contains(&v) }
@@ -120,19 +129,73 @@ impl Game {
                 let z = cz*SIDE as i32 + lz as i32;
                 let h = self.height_at(x,z);
                 let biome = self.biome(x,z);
-                let top = if h <= SEA+1 || biome == 1 { SAND }
-                    else if biome == 2 || h >= 42 { SNOW }
-                    else { GRASS };
+                let top = if biome == 1 {
+                    if hash(x,z,self.seed^7)%9==0 { RED_SAND } else { SAND }
+                } else if h <= SEA+1 {
+                    if hash(x,z,self.seed^11)%7==0 { GRAVEL } else { SAND }
+                } else if biome == 2 || h >= 42 { SNOW }
+                else if h > 35 && hash(x,z,self.seed^2)%3 == 0 { STONE }
+                else if hash(x,z,self.seed^21)%13==0 { MOSS }
+                else { GRASS };
                 for y in 0..=h as usize {
                     let v = if y == 0 { 12 }
                         else if y == h as usize { top }
                         else if y > (h - 4).max(0) as usize {
-                            if top == SAND { SAND } else { DIRT }
+                            if top == SAND || top == RED_SAND { top } else { DIRT }
                         } else { STONE };
                     b[idx(lx,y,lz)] = v;
                 }
                 if h < SEA {
                     for y in h+1..=SEA { b[idx(lx,y as usize,lz)] = WATER; }
+                }
+            }
+        }
+        // Low-frequency cave chambers. The centers are keyed to neighboring
+        // chunks so a chamber crossing a boundary stays continuous.
+        for bx in (cx-1)..=(cx+1) {
+            for bz in (cz-1)..=(cz+1) {
+                let r=hash(bx,bz,self.seed ^ 0x9125_8a27);
+                if r % 3 != 1 { continue; }
+                let center_x=(bx*SIDE as i32 + 2 + ((r>>5)%12) as i32) as f32;
+                let center_z=(bz*SIDE as i32 + 2 + ((r>>11)%12) as i32) as f32;
+                let center_y=(9+((r>>17)%16) as i32) as f32;
+                let rx=4.0+((r>>2)%5) as f32;
+                let rz=4.0+((r>>7)%5) as f32;
+                let ry=2.5+((r>>13)%3) as f32;
+                for lx in 0..SIDE {
+                    let dx=(cx*SIDE as i32+lx as i32) as f32-center_x;
+                    if dx.abs()>rx { continue; }
+                    for lz in 0..SIDE {
+                        let dz=(cz*SIDE as i32+lz as i32) as f32-center_z;
+                        let r2=(dx/rx).powi(2)+(dz/rz).powi(2);
+                        if r2>=1.0 { continue; }
+                        let extent=ry*(1.0-r2).sqrt();
+                        let lo=((center_y-extent).floor() as i32).max(5);
+                        let hi=((center_y+extent).ceil() as i32).min(HEIGHT as i32-2);
+                        let h=self.height_at(cx*SIDE as i32+lx as i32,cz*SIDE as i32+lz as i32);
+                        for y in lo..=hi.min(h-3) {
+                            let pos=idx(lx,y as usize,lz);
+                            if b[pos]==STONE || b[pos]==DIRT { b[pos]=AIR; }
+                        }
+                    }
+                }
+            }
+        }
+        // Rare natural ore veins and stone variation in the lower layers.
+        for lx in 0..SIDE {
+            for lz in 0..SIDE {
+                let x=cx*SIDE as i32+lx as i32;
+                let z=cz*SIDE as i32+lz as i32;
+                let h=self.height_at(x,z);
+                for y in 4..=(h-4).max(4) {
+                    let i=idx(lx,y as usize,lz);
+                    if b[i]!=STONE { continue; }
+                    let v=hash(x+y*7,z-y*13,self.seed^0x2f35_a7cd);
+                    b[i]=if y<18 && v%475==2 { GOLD }
+                       else if y<33 && v%115==4 { COPPER }
+                       else if v%87==9 { COBBLE }
+                       else if v%191==10 { GRAVEL }
+                       else { STONE };
                 }
             }
         }
@@ -146,15 +209,15 @@ impl Game {
                 let biome = self.biome(x,z);
                 let roll = hash(x,z,self.seed);
                 if biome == 1 {
-                    if roll % 270 == 7 && lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12 {
+                    if roll % 95 == 7 && lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12 {
                         for y in (h+1)..=(h+3) {
                             b[idx(lx,y as usize,lz)] = CACTUS;
                         }
                     }
-                } else if biome != 2 && roll % 285 == 5 && lx >= 4 && lx <= 11 && lz >= 4 && lz <= 11 {
+                } else if biome != 2 && roll % 89 == 5 && lx >= 4 && lx <= 11 && lz >= 4 && lz <= 11 {
                     let height = 4 + (roll >> 8) % 3;
                     for dy in 1..=height {
-                        b[idx(lx,(h+dy as i32) as usize,lz)] = LOG;
+                        b[idx(lx,(h+dy as i32) as usize,lz)] = if roll%4==0 { DARK_LOG } else { LOG };
                     }
                     let crown = h + height as i32;
                     for dy in -2i32..=2 {
@@ -202,7 +265,7 @@ impl Game {
     }
 
     pub fn set_block(&mut self,x:i32,y:i32,z:i32,value:u8) -> bool {
-        if y <= 0 || y >= HEIGHT as i32 || value > 24 { return false; }
+        if y <= 0 || y >= HEIGHT as i32 || value > 32 { return false; }
         let prev = self.block(x,y,z);
         if prev == value { return false; }
         let cx=x.div_euclid(SIDE as i32);
@@ -468,6 +531,27 @@ mod tests {
         assert!(is_water(b.block(6,54,6)));
     }
 
+    #[test]
+    fn custom_building_blocks_survive_save() {
+        let mut g=Game::new(445);
+        for (i,id) in (25u8..=32).enumerate() {
+            assert!(g.set_block(i as i32+3,48,4,id));
+        }
+        let save=g.export_save();
+        let mut restored=Game::new(445);
+        assert!(restored.import_save(&save));
+        for (i,id) in (25u8..=32).enumerate() {
+            assert_eq!(restored.block(i as i32+3,48,4),id);
+        }
+    }
+    #[test]
+    fn cave_generation_is_deterministic() {
+        let mut a=Game::new(771);
+        let mut b=Game::new(771);
+        for cx in -1..=1 { for cz in -1..=1 {
+            assert_eq!(a.chunk(cx,cz),b.chunk(cx,cz));
+        }}
+    }
     #[test]
     fn negative_chunk_coords_work() {
         let mut a=Game::new(1);
