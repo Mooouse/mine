@@ -61,7 +61,7 @@ const CHUNK=16, WORLD_HEIGHT=64;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let game,gl,worldProgram,skyProgram,lineProgram,vaoSky,vaoLine,vboLine;
 let playing=false, paused=false, menuVisible=true, selected=0;
-let yaw=.24,pitch=-.13,sensitivity=1, renderDistance=3, target=[], player=[8,34,8], seed=42042;
+let yaw=.24,pitch=-.13,sensitivity=1, fov=75, soundEnabled=true, debugVisible=false, renderDistance=3, target=[], player=[8,34,8], seed=42042;
 let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
 let joystick={x:0,y:0,pointer:null};
@@ -72,6 +72,59 @@ const glState={camera:[0,0,0],vp:new Float32Array(16)};
 const MOBILE_ACTIONS = {jump:false,break:false,place:false};
 let glReady=false, visibleChunks=0;
 const waterDirty=new Set();
+let itemToastTimer=0, helpTimer=0, audioContext=null;
+function showSelectedName(){
+  const id=inventorySlots[selected],node=$("itemToast");
+  clearTimeout(itemToastTimer);
+  node.textContent=BLOCKS[id]?.name||"";
+  node.classList.toggle("hidden",!id);
+  if(id)itemToastTimer=setTimeout(()=>node.classList.add("hidden"),1700);
+}
+function soundEffect(place){
+  if(!soundEnabled||menuVisible)return;
+  try {
+    const AudioAPI=window.AudioContext||window.webkitAudioContext;
+    if(!AudioAPI)return;
+    if(!audioContext)audioContext=new AudioAPI();
+    const ctx=audioContext;
+    if(ctx.state==="suspended")ctx.resume().catch(()=>{});
+    const length=Math.floor(ctx.sampleRate*(place?.075:.135));
+    const buffer=ctx.createBuffer(1,length,ctx.sampleRate),samples=buffer.getChannelData(0);
+    let seed=1717+(place?193:59);
+    for(let i=0;i<length;i++){
+      seed=(1664525*seed+1013904223)>>>0;
+      samples[i]=((seed/4294967296)*2-1)*Math.pow(1-i/length,place?1.5:2.1);
+    }
+    const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+    source.buffer=buffer;filter.type="lowpass";filter.frequency.value=place?520:860;
+    gain.gain.value=place?.065:.08;
+    source.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+    source.start();source.onended=()=>{source.disconnect();filter.disconnect();gain.disconnect();};
+  } catch(e) { /* Audio disabled or browser suspended. */ }
+}
+function spawnDebris(id){
+  const box=$("particles");
+  if(!box)return;
+  const color=BLOCKS[id]?.hex||"#bdad8c";
+  for(let i=0;i<9;i++){
+    const p=document.createElement("i");
+    p.className="debris";
+    p.style.background=color;
+    p.style.setProperty("--dx",(Math.random()*120-60)+"px");
+    p.style.setProperty("--dy",(Math.random()*90-70)+"px");
+    p.style.setProperty("--rot",(Math.random()*250-125)+"deg");
+    p.style.left="50%";p.style.top="50%";
+    box.appendChild(p);
+    setTimeout(()=>p.remove(),440);
+  }
+}
+function showHelp(){
+  const hud=$("hud");
+  if(hud.classList.contains("hidden"))return;
+  clearTimeout(helpTimer);
+  hud.classList.add("help-visible");
+  helpTimer=setTimeout(()=>hud.classList.remove("help-visible"),10000);
+}
 let suppressPointerUnlockUntil=0;
 const isWater=id=>id===8||(id>=17&&id<=24);
 const waterHeight=(id,aboveWater=false)=>{
@@ -559,7 +612,7 @@ function render(time){
   const cp=Math.cos(pitch);
   const forward=[Math.sin(yaw)*cp,Math.sin(pitch),-Math.cos(yaw)*cp];
   const eye=[cx,cy,cz];
-  const proj=perspective(70*Math.PI/180,canvas.width/canvas.height,.055,Math.max(160,renderDistance*16+72));
+  const proj=perspective(fov*Math.PI/180,canvas.width/canvas.height,.055,Math.max(160,renderDistance*16+72));
   const vp=multiply(proj,lookAt(eye,forward));
   glState.vp=vp;glState.camera=eye;
   const day=clamp(.42+Math.sin(game.time()/1200*Math.PI*2)*.67,0,1);
@@ -629,13 +682,16 @@ function action(place=false){
     const overlap = Math.abs(player[0]-(tx+.5)) < .8 &&
                     Math.abs(player[2]-(tz+.5)) < .8 &&
                     ty<player[1]+1.76 && ty+1>player[1];
-    if(overlap)return;
+    if(overlap&&chosen!==8&&chosen!==10&&chosen!==14)return;
     if(game.set_block(tx,ty,tz,chosen)){
       invalidateBlocks(tx,tz);
+      soundEffect(true);
       player=game.player();
     }
   }else if(game.set_block(x,y,z,0)){
     invalidateBlocks(x,z);
+    spawnDebris((id>=17&&id<=24)?8:id);
+    soundEffect(false);
   }
 }
 function tintColor(hex,scale){
@@ -685,6 +741,7 @@ function renderHotbar(){
 function setSelected(i){
   selected=(i+9)%9;
   renderHotbar();
+  showSelectedName();
   if(inventoryOpen)renderInventory();
 }
 function setHeldItem(id){
@@ -814,6 +871,15 @@ function renderHUD(){
   $("mode").firstChild.textContent=game.flying()?"FLY MODE ":"WALK MODE ";
   $("block-count").textContent=game.edits_count().toLocaleString();
   $("block-name").textContent=target.length===7?BLOCKS[(target[6]>=17&&target[6]<=24)?8:target[6]]?.name||"BLOCK":"";
+  if(debugVisible){
+    $("debugOverlay").textContent=
+      "MINE 0.3 / RUST + WEBASSEMBLY\n"+
+      Math.round(fps)+" FPS | "+visibleChunks+" ACTIVE CHUNKS\n"+
+      "XYZ "+player.slice(0,3).map(n=>n.toFixed(2)).join(" / ")+"\n"+
+      "Seed "+seed+" | Time "+Math.floor(game.time())+"\n"+
+      "Mode "+(game.flying()?"Creative flight":"Creative")+"\n"+
+      "Water updates "+game.water_pending()+" | Edits "+game.edits_count();
+  }
   const degrees=(yaw*180/Math.PI%360+360)%360;
   const dirs=["N","NE","E","SE","S","SW","W","NW"];
   $("compass").innerHTML=dirs[Math.round(degrees/45)%8]+' <span>•</span> '+String(Math.round(degrees)).padStart(3,"0")+'°';
@@ -851,7 +917,8 @@ function start(){
   $("hud").classList.remove("hidden");
   if(isMobile)$("mobile-controls").classList.remove("hidden");
   else canvas.requestPointerLock?.().catch(()=>{});
-  toast("Welcome to your world! "+(isMobile?"Drag to look around.":"Press F to toggle flight."));
+  showHelp();
+  showSelectedName();
 }
 function pause(){
   if(!playing || paused || inventoryOpen)return;
@@ -918,6 +985,8 @@ function connectControls(){
   $("saveButton").addEventListener("click",()=>{save();toast("WORLD SAVED");});
   $("renderDistance").addEventListener("change",e=>{renderDistance=Number(e.target.value);localStorage.setItem("mine_distance",String(renderDistance));});
   $("sensitivity").addEventListener("input",e=>{sensitivity=Number(e.target.value);localStorage.setItem("mine_sensitivity",String(sensitivity));});
+  $("fovRange").addEventListener("input",e=>{fov=Number(e.target.value);localStorage.setItem("mine_fov",String(fov));});
+  $("soundToggle").addEventListener("change",e=>{soundEnabled=e.target.checked;localStorage.setItem("mine_sound",soundEnabled?"1":"0");});
   addEventListener("keydown",e=>{
     if(["Space","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)&&playing)e.preventDefault();
     if(e.code==="Escape"){
@@ -928,9 +997,24 @@ function connectControls(){
     const inputActive=e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement;
     if(inputActive)return;
     if(!playing||paused)return;
+    if(e.code==="F1"&&!e.repeat){
+      e.preventDefault();
+      $("hud").classList.toggle("hidden");
+      return;
+    }
+    if(e.code==="F3"&&!e.repeat){
+      e.preventDefault();debugVisible=!debugVisible;
+      $("debugOverlay").classList.toggle("hidden",!debugVisible);
+      renderHUD();return;
+    }
+    if(e.code==="KeyH"&&!e.repeat){showHelp();return;}
     if(e.code==="KeyE"&&!e.repeat){toggleInventory();return;}
     if(inventoryOpen)return;
     held.add(e.code);
+    if(e.code==="KeyQ"&&!e.repeat) {
+      // Creative mode: clear selected hotbar slot (no spawned dropped entity).
+      inventorySlots[selected]=0;saveInventory();renderHotbar();showSelectedName();
+    }
     if(/^Digit[1-9]$/.test(e.code))setSelected(Number(e.code.slice(5))-1);
     if(e.code==="Space"&&!e.repeat){
       const now=performance.now();
@@ -1073,6 +1157,11 @@ async function main(){
     renderDistance=Number(localStorage.getItem("mine_distance"))||3;
     renderDistance=clamp(renderDistance,2,5);
     sensitivity=Number(localStorage.getItem("mine_sensitivity"))||1;
+    fov=Number(localStorage.getItem("mine_fov"))||75;
+    fov=clamp(fov,55,105);
+    soundEnabled=localStorage.getItem("mine_sound")!=="0";
+    $("fovRange").value=String(fov);
+    $("soundToggle").checked=soundEnabled;
     $("renderDistance").value=String(renderDistance);
     $("sensitivity").value=String(sensitivity);
     for(let z=-1;z<=1;z++)for(let x=-1;x<=1;x++){
