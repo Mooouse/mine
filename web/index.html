@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0c151b" />
+  <meta name="description" content="MINE — a procedurally generated voxel sandbox running on Rust and WebAssembly." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+  <title>MINE — Build your own world</title>
+</head>
+<body>
+  <canvas id="game" aria-label="3D voxel sandbox"></canvas>
+
+  <div id="hud" class="hud hidden">
+    <header class="topbar">
+      <div class="brand-line"><div class="brand-mark">M</div><div><strong>MINE</strong><small>WORLD EXPLORER</small></div></div>
+      <div class="top-pills">
+        <span class="pill desktop-only"><span class="online-dot"></span> RUST / WASM</span>
+        <span class="pill" id="coordinates">0, 0, 0</span>
+        <span class="pill desktop-only" id="fps">60 FPS</span>
+      </div>
+      <button id="pauseButton" class="icon-button" title="Pause (Esc)" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+    </header>
+    <div class="compass" id="compass">N <span>•</span> 000°</div>
+    <div class="crosshair"><span></span><span></span><span></span><span></span></div>
+    <div id="block-name" class="block-label"></div>
+    <div class="target-outline hidden" id="target-box"></div>
+    <div class="hud-footer">
+      <div class="tips desktop-only"><span class="key">W A S D</span> move &nbsp;&nbsp;<span class="key">SPACE</span> jump &nbsp;&nbsp;<span class="key">LMB</span> break &nbsp;&nbsp;<span class="key">RMB</span> place &nbsp;&nbsp;<span class="key">F</span> fly</div>
+      <div id="hotbar" class="hotbar"></div>
+      <div class="mode-text" id="mode">WALK MODE <span>•</span> <span id="block-count">0</span> BLOCKS CHANGED</div>
+    </div>
+  </div>
+
+  <div id="mobile-controls" class="hidden">
+    <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
+    <div class="mobile-right">
+      <button id="touch-break" class="touch-button" aria-label="Break">⛏<small>BREAK</small></button>
+      <button id="touch-place" class="touch-button" aria-label="Place">▣<small>PLACE</small></button>
+      <button id="touch-jump" class="touch-button" aria-label="Jump">↑<small>JUMP</small></button>
+    </div>
+  </div>
+
+  <div id="notifications" aria-live="polite"></div>
+
+  <div id="menu" class="menu-screen">
+    <div class="menu-vignette"></div>
+    <div class="menu-content">
+      <div class="eyebrow"><span class="online-dot"></span> A NEW WORLD BEGINS HERE</div>
+      <h1>MINE<span class="title-period">.</span></h1>
+      <p class="tagline">A whole world. One block at a time.</p>
+      <div class="menu-separator"></div>
+      <div class="menu-info">
+        <div><strong>∞</strong><span>PROCEDURAL WORLD</span></div>
+        <div><strong>16</strong><span>BLOCK MATERIALS</span></div>
+        <div><strong>3D</strong><span>SANDBOX</span></div>
+      </div>
+      <div class="menu-actions">
+        <button id="playButton" class="primary-button"><span>ENTER THE WORLD</span><span class="arrow">↗</span></button>
+        <button id="newButton" class="secondary-button">CREATE NEW WORLD <span>＋</span></button>
+      </div>
+      <div class="seed-row"><label for="seedInput">WORLD SEED</label><input id="seedInput" type="text" inputmode="numeric" value="42042" maxlength="10"/><button id="randomSeed" title="Randomize seed" aria-label="Randomize seed">↻</button></div>
+      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.1</span></div>
+    </div>
+    <div class="menu-scenery-caption">EXPLORE <span>•</span> CREATE <span>•</span> DISCOVER</div>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-overline">WORLD PAUSED</div>
+      <h2>Take a moment<span class="title-period">.</span></h2>
+      <p>All of your changes are saved automatically to this device.</p>
+      <button id="resumeButton" class="primary-button"><span>RESUME EXPLORING</span><span class="arrow">↗</span></button>
+      <button id="saveButton" class="secondary-button">SAVE NOW <span>✓</span></button>
+      <button id="leaveButton" class="secondary-button">RETURN TO MENU <span>←</span></button>
+      <div class="setting-row"><label for="renderDistance">RENDER DISTANCE</label><select id="renderDistance"><option value="2">LOW (5 CHUNKS)</option><option value="3" selected>MEDIUM (7 CHUNKS)</option><option value="4">HIGH (9 CHUNKS)</option><option value="5">ULTRA (11 CHUNKS)</option></select></div>
+      <div class="setting-row"><label for="sensitivity">MOUSE SENSITIVITY</label><input id="sensitivity" type="range" min="0.5" max="2.5" step="0.1" value="1.0"/></div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-screen">
+    <div class="loading-logo">M<span>.</span></div>
+    <div id="loading-message">INITIALIZING RUST ENGINE</div>
+    <div class="loading-track"><div id="loading-progress"></div></div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
