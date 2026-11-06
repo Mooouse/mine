@@ -48,8 +48,38 @@ try{
   if(assigned!=="WATER")throw new Error("Creative inventory transfer did not work");
   await page.keyboard.press("Escape");
   await page.locator("#inventory").waitFor({state:"hidden"});
+
+  // Every minigame must launch the 3D Rust world, spawn real NPC meshes,
+  // exit to the mode lobby, and leave the player's sandbox save unchanged.
+  await page.locator("#pauseButton").evaluate(el=>el.click());
+  await page.locator("#leaveButton").evaluate(el=>el.click());
+  await page.locator("#menu").waitFor({state:"visible"});
+  const currentSeed=await page.locator("#seedInput").inputValue();
+  const sandboxSave=await page.evaluate(seed=>localStorage.getItem("mine_world_"+seed),currentSeed);
+  await page.locator("#miniGamesButton").evaluate(el=>el.click());
+  await page.locator("#miniLobby").waitFor({state:"visible"});
+  for(const id of ["spleef","tntrun","parkour","blockparty","sumo"]){
+    await page.locator('[data-minigame="'+id+'"]').evaluate(el=>el.click());
+    await page.locator("#miniHud").waitFor({state:"visible",timeout:9000});
+    if(!await page.locator("#hud").evaluate(el=>el.classList.contains("minigame-active")))
+      throw new Error("Minigame HUD did not activate: "+id);
+    await page.waitForTimeout(300);
+    if(await page.locator("#miniBotLabels .mini-bot-label").count()!==4)
+      throw new Error("Missing 4 pseudo-player bots: "+id);
+    if(await page.locator("#miniHudTitle").textContent()!==id.toUpperCase().replace("TNTRUN","TNT RUN").replace("BLOCKPARTY","BLOCK PARTY").replace("PARKOUR","PARKOUR RACE"))
+      throw new Error("Wrong minigame title: "+id);
+    await page.locator("#miniScoreBack").evaluate(el=>el.click());
+    await page.locator("#miniLobby").waitFor({state:"visible",timeout:5000});
+    if(await page.locator("#seedInput").inputValue()!==currentSeed)
+      throw new Error("Minigame changed the saved sandbox seed: "+id);
+    const afterSave=await page.evaluate(seed=>localStorage.getItem("mine_world_"+seed),currentSeed);
+    if(afterSave!==sandboxSave)
+      throw new Error("Minigame overwrote sandbox world save: "+id);
+  }
+  await page.locator("#miniClose").evaluate(el=>el.click());
+  if(!await page.locator("#menu").isVisible())throw new Error("Main menu did not return after minigames");
   if(errors.length) throw new Error("Browser errors: "+errors.join(" | "));
-  console.log("PASS: WASM + WebGL2, 36-slot inventory, 24 original materials, block transfer, E/Escape controls");
+  console.log("PASS: WASM + WebGL2, creative inventory, 5 playable minigame arenas, 4 bot rivals per mode, sandbox save isolation");
 }finally{
   await browser.close();
 }
