@@ -215,3 +215,18 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .offhand-hud{width:32px;height:47px;border-radius:7px}
   .offhand-hud .cube{width:17px;height:17px}
 }
+
+/* Compact the HUD around the offhand instead of letting touch controls overlap. */
+@media(hover:none) and (orientation:landscape){
+  .hud .hotbar .slot{width:clamp(25px,5vw,39px);height:43px}
+  .hud .hotbar .slot .cube{width:17px;height:17px}
+  .hud .hotbar .slot .name{font-size:6px}
+  .hud .hotbar{gap:2px;padding:4px}
+  .offhand-hud{width:30px;height:42px}
+}
+@media(max-width:430px){
+  .hud .hotbar .slot{width:max(24px,calc((100vw - 68px)/9));height:44px}
+  .hud .hotbar{gap:2px;padding:4px}
+  .hud .hotbar .slot .name{font-size:6px}
+  .offhand-hud{width:28px;height:43px}
+}
