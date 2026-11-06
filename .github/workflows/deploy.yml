@@ -34,6 +34,13 @@ jobs:
           mkdir -p dist
           cp -r web/. dist/
           cp -r pkg dist/pkg
+      - name: Install browser test dependency
+        run: npm install --no-save --no-package-lock playwright@1.56.1
+      - name: Browser smoke test (WASM + WebGL2)
+        run: |
+          which google-chrome
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > /tmp/mine_http.log 2>&1 &
+          node tests/browser-smoke.mjs
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v3
         with:
