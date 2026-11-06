@@ -334,12 +334,12 @@ impl Game {
         }
 
         let nx = self.px + self.vx*dt;
-        if !self.collides(nx,self.py,self.pz) && !(sneak && self.grounded && !self.solid(nx.floor() as i32,(self.py-.10).floor() as i32,self.pz.floor() as i32)) { self.px=nx; }
+        if !self.collides(nx,self.py,self.pz) && !(sneak && self.grounded && !self.solid(nx.floor() as i32,(self.py-0.10).floor() as i32,self.pz.floor() as i32)) { self.px=nx; }
         else if self.grounded && !self.collides(nx,self.py+1.05,self.pz) {
             self.px=nx; self.py+=1.05;
         } else { self.vx=0.0; }
         let nz = self.pz + self.vz*dt;
-        if !self.collides(self.px,self.py,nz) && !(sneak && self.grounded && !self.solid(self.px.floor() as i32,(self.py-.10).floor() as i32,nz.floor() as i32)) { self.pz=nz; }
+        if !self.collides(self.px,self.py,nz) && !(sneak && self.grounded && !self.solid(self.px.floor() as i32,(self.py-0.10).floor() as i32,nz.floor() as i32)) { self.pz=nz; }
         else if self.grounded && !self.collides(self.px,self.py+1.05,nz) {
             self.pz=nz; self.py+=1.05;
         } else { self.vz=0.0; }
