@@ -84,6 +84,17 @@ jobs:
           grep -o -m1 'ui-v2.css' /tmp/mine_pages.html || echo "New UI stylesheet not present"
           echo "== Standalone site branch =="
           git ls-remote https://github.com/${GITHUB_REPOSITORY}.git refs/heads/site | head -1
+      - name: Attempt automatic Pages switch to built site branch
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Switching Pages from stale workflow deployment to compiled site branch"
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" \
+            -f build_type=legacy \
+            -f 'source[branch]=site' \
+            -f 'source[path]=/'
+          echo "Pages is now configured to publish site:/"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages site
