@@ -200,3 +200,18 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .inv-bottom{margin-top:4px;padding-top:5px}
   .inv-clear{margin-top:5px}
 }
+
+.hotbar-wrap{display:flex;gap:10px;align-items:center;justify-content:center}
+.offhand-hud{display:grid;place-items:center;width:48px;height:53px;background:rgba(6,17,19,.66);border:1px solid rgba(235,255,240,.3);border-radius:10px;backdrop-filter:blur(12px);color:#ecffde;pointer-events:auto;box-shadow:0 10px 28px #0004}
+.offhand-hud:hover{border-color:#c5ff8b}
+.offhand-hud.offhand-empty{opacity:.35}
+.offhand-hud .cube{width:22px;height:22px;transform:rotate(-30deg) skew(7deg,7deg);box-shadow:inset -5px -4px #0003,inset 3px 3px #fff3}
+.offhand-section{display:flex;align-items:center;gap:16px;margin:14px 0 0;padding:9px 0;border-top:1px solid #60756666}
+.offhand-section .inv-section-title{margin:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+#inventoryOffhand{width:39px}
+#inventoryOffhand .inv-slot{width:39px;height:39px}
+@media(max-width:700px){
+  .hotbar-wrap{gap:4px}
+  .offhand-hud{width:32px;height:47px;border-radius:7px}
+  .offhand-hud .cube{width:17px;height:17px}
+}
