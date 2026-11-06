@@ -130,34 +130,82 @@ float hash3(vec3 p){
  p=fract(p*.1031);p+=dot(p,p.yxz+33.33);
  return fract((p.x+p.y)*p.z);
 }
+vec2 faceCoords(vec3 p,vec3 n){
+  if(abs(n.y)>.5)return p.xz;
+  if(abs(n.x)>.5)return p.zy;
+  return p.xy;
+}
 vec3 palette(float m,vec3 n,vec3 p){
- float top=step(.5,n.y); float side=1.-abs(n.y);
- if(m<1.5) {
-   vec3 dirt=vec3(.44,.315,.225);
-   float band=step(.78,fract(p.y+.001));
-   return mix(dirt,vec3(.35,.56,.265),max(top,band*side));
- }
- if(m<2.5) return vec3(.44,.32,.245);
- if(m<3.5) return vec3(.49,.54,.545);
- if(m<4.5) return vec3(.87,.735,.505);
- if(m<5.5){
-   if(top>0.5) return vec3(.67,.49,.29);
-   return vec3(.46,.295,.15)*(.94+.07*sin(p.y*12.+p.x*14.));
- }
- if(m<6.5)return vec3(.27,.48,.30);
- if(m<7.5)return mix(vec3(.69,.77,.79),vec3(.91,.97,.96),top);
- if(m<8.5)return vec3(.26,.60,.79);
- if(m<9.5){
-    vec3 q=fract(p*2.);float mortar=step(q.y,.045)+step(fract(p.x*2.+floor(p.y*2.)*.5),.052);
-    return mix(vec3(.61,.315,.255),vec3(.31,.23,.22),min(mortar,1.));
- }
- if(m<10.5)return vec3(.61,.84,.88);
- if(m<11.5){float seam=step(fract(p.y*2.),.04);return mix(vec3(.71,.48,.25),vec3(.36,.22,.13),seam);}
- if(m<12.5)return vec3(.23,.27,.34);
- if(m<13.5)return vec3(1.,.84,.40);
- if(m<14.5)return mix(vec3(.22,.55,.24),vec3(.96,.43,.58),step(.55,fract(p.y)));
- if(m<15.5)return vec3(.58,.57,.62);
- return vec3(.26,.56,.31);
+  vec2 uv=faceCoords(p,n);
+  vec2 pixel=floor(uv*16.0);
+  float r=hash3(vec3(pixel,m+0.5));
+  float r2=hash3(vec3(floor(uv*7.0),m+5.4));
+  float high=step(.78,r);
+  float low=step(r,.16);
+  float top=step(.5,n.y);
+  float fringe=step(.87,fract(p.y+0.001));
+  vec3 shade=vec3(.94+r*.14+r2*.06);
+  if(m<1.5){
+    vec3 soil=vec3(.45,.33,.225)*shade;
+    vec3 turf=vec3(.33,.53,.25);
+    turf=mix(turf,vec3(.52,.64,.30),high*.44);
+    turf=mix(turf,vec3(.19,.42,.18),low*.4);
+    return mix(soil,turf,max(top,fringe*(1.0-top)));
+  }
+  if(m<2.5)return vec3(.43,.31,.22)*shade*(1.0-high*.11);
+  if(m<3.5){
+    vec3 stone=vec3(.48,.52,.51)*shade;
+    stone=mix(stone,vec3(.33,.38,.40),low*.7);
+    return stone;
+  }
+  if(m<4.5)return vec3(.89,.76,.54)*shade+vec3(high*.027);
+  if(m<5.5 || (m>27.5&&m<28.5)){
+    if(top>.5){
+      vec2 mid=fract(p.xz)-.5;
+      float rings=sin(length(mid)*48.)*.13;
+      return vec3(.59,.40,.24)*(1.+rings)*shade;
+    }
+    float bark=sin(uv.x*16.0)*.055+step(.84,r)*.075;
+    vec3 wood=m<5.5?vec3(.46,.30,.17):vec3(.31,.225,.16);
+    return wood*(1.0+bark)*shade;
+  }
+  if(m<6.5){
+    vec3 leaves=vec3(.26,.46,.255);
+    return mix(leaves,vec3(.38,.58,.31),high*.7+low*.26)*shade;
+  }
+  if(m<7.5)return mix(vec3(.72,.78,.79),vec3(.92,.95,.93),top)*shade;
+  if(m<8.5)return vec3(.26,.56,.69);
+  if(m<9.5){
+    float mortar=max(step(fract(p.y*2.),.07),step(fract(p.x*2.+floor(p.y*2.)*.5),.052));
+    return mix(vec3(.62,.33,.26)*shade,vec3(.30,.24,.22),mortar);
+  }
+  if(m<10.5)return vec3(.71,.86,.90);
+  if(m<11.5){
+    float seam=step(fract(p.y*2.),.055);
+    return mix(vec3(.72,.49,.28)*shade,vec3(.39,.28,.18),seam);
+  }
+  if(m<12.5)return vec3(.245,.28,.33)*shade;
+  if(m<13.5)return vec3(.97,.81,.38)*(1.0+high*.20);
+  if(m<14.5)return mix(vec3(.20,.50,.24),vec3(.95,.40,.59),step(.56,fract(p.y)));
+  if(m<15.5)return vec3(.60,.60,.62)*shade;
+  if(m<16.5)return vec3(.28,.55,.29)*shade;
+  if(m<25.5){
+    float crack=step(r2,.16);
+    return mix(vec3(.48,.52,.49)*shade,vec3(.31,.36,.35),crack*.77);
+  }
+  if(m<26.5)return mix(vec3(.60,.60,.57),vec3(.44,.44,.42),high+low)*shade;
+  if(m<27.5)return mix(vec3(.28,.47,.25),vec3(.40,.56,.30),high)*shade;
+  if(m<28.5)return vec3(.31,.24,.17)*shade;
+  if(m<29.5){
+    vec3 ore=vec3(.48,.51,.50)*shade;
+    return mix(ore,vec3(.66,.34,.22),step(.82,r)*step(.20,r2));
+  }
+  if(m<30.5){
+    vec3 ore=vec3(.50,.53,.52)*shade;
+    return mix(ore,vec3(.92,.71,.25),step(.78,r)*step(.18,r2));
+  }
+  if(m<31.5)return vec3(.73,.37,.21)*shade;
+  return mix(vec3(.78,.58,.31),vec3(1.0,.87,.52),high)*shade;
 }
 void main(){
   vec3 p=vPos-vNorm*.001;
@@ -168,6 +216,7 @@ void main(){
   // Lighting is oriented by the mesher, with subtle ambient occlusion.
   color *= mix(.38,1.,uDay) * vBright + (1.-uDay)*.035;
   if(vMat>12.5&&vMat<13.5)color += vec3(.36,.28,.08);
+  if(vMat>31.5&&vMat<32.5)color += vec3(.25,.19,.07);
   if(vMat>7.5&&vMat<8.5){
     float waveA=sin(vPos.x*2.2+vPos.z*.8+uTime*.0019);
     float waveB=sin(vPos.z*2.9-vPos.x*.65-uTime*.0015);
