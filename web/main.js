@@ -17,7 +17,27 @@ const BLOCKS = [
   {name:"LUMEN",hex:"#f8d775"}, {name:"FLOWER",hex:"#ef8da6"},
   {name:"CLAY",hex:"#a3a1a4"}, {name:"CACTUS",hex:"#4f9759"},
 ];
-const HOTBAR_BLOCKS = [1,2,3,4,5,6,7,9,13,10,11,12,15,16,8,14];
+const MATERIALS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
+const INITIAL_HOTBAR = [1,2,3,4,5,6,7,9,8];
+const INVENTORY_SIZE=36;
+let inventorySlots=Array.from({length:INVENTORY_SIZE},(_,i)=>INITIAL_HOTBAR[i]||0);
+let inventoryOpen=false, heldItem=0, inventoryFilter="all", lastSpaceTap=-1000, lastWaterTick=0;
+function loadInventory(reset=false){
+  inventorySlots=Array.from({length:INVENTORY_SIZE},(_,i)=>INITIAL_HOTBAR[i]||0);
+  if(!reset){
+    try{
+      const stored=JSON.parse(localStorage.getItem("mine_inventory_"+seed));
+      if(Array.isArray(stored)&&stored.length===INVENTORY_SIZE){
+        inventorySlots=stored.map(v=>Number.isInteger(v)&&v>=0&&v<=16?v:0);
+      }
+    }catch(e){/* Ignore outdated inventory format. */}
+  }
+  selected=clamp(selected,0,8);
+  renderHotbar();
+}
+function saveInventory(){
+  try{localStorage.setItem("mine_inventory_"+seed,JSON.stringify(inventorySlots));}catch(e){}
+}
 const FACES = [
   { d:[1,0,0], n:[1,0,0], c:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]], light:.78 },
   { d:[-1,0,0],n:[-1,0,0],c:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]], light:.73 },
@@ -30,7 +50,7 @@ const TRI = [0,1,2,0,2,3];
 const CHUNK=16, WORLD_HEIGHT=64;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let game,gl,worldProgram,skyProgram,lineProgram,vaoSky,vaoLine,vboLine;
-let playing=false, paused=false, menuVisible=true, selected=0, page=0;
+let playing=false, paused=false, menuVisible=true, selected=0;
 let yaw=.24,pitch=-.13,sensitivity=1, renderDistance=3, target=[], player=[8,34,8], seed=42042;
 let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
@@ -437,12 +457,13 @@ function getTarget(){
   return game.raycast(player[0],player[1]+1.62,player[2],...f,7);
 }
 function action(place=false){
-  if(!playing||paused||menuVisible)return;
+  if(!playing||paused||menuVisible||inventoryOpen)return;
   const found=getTarget();
   if(found.length!==7)return;
   const [x,y,z,tx,ty,tz,id]=found;
   if(place){
-    const chosen=HOTBAR_BLOCKS[selected];
+    const chosen=inventorySlots[selected];
+    if(!chosen) return;
     const overlap = Math.abs(player[0]-(tx+.5)) < .8 &&
                     Math.abs(player[2]-(tz+.5)) < .8 &&
                     ty<player[1]+1.76 && ty+1>player[1];
@@ -455,33 +476,140 @@ function action(place=false){
     invalidateBlocks(x,z);
   }
 }
+function blockIcon(id){
+  const info=BLOCKS[id];
+  return info?'<span class="cube" style="background:'+info.hex+'"></span>':'';
+}
+function inventoryButton(id,index,type){
+  const el=document.createElement("button");
+  el.className="inv-slot"+(!id?" empty":"")+(type==="slot"&&index===selected?" active":"");
+  el.dataset.index=index;el.dataset.type=type;
+  el.title=id?BLOCKS[id].name:"Empty slot";
+  el.setAttribute("aria-label",id?BLOCKS[id].name:"Empty slot");
+  el.innerHTML=blockIcon(id)+(type==="slot"&&index<9?'<span class="small-num">'+(index+1)+'</span>':'');
+  return el;
+}
 function renderHotbar(){
-  const hotbar=$("hotbar");
-  hotbar.replaceChildren();
-  const start=page*9;
-  HOTBAR_BLOCKS.slice(start,start+9).forEach((id,i)=>{
-    const info=BLOCKS[id];
-    const n=start+i;
+  const hotbar=$("hotbar");hotbar.replaceChildren();
+  for(let i=0;i<9;i++){
+    const id=inventorySlots[i],info=BLOCKS[id];
     const el=document.createElement("button");
-    el.className="slot"+(n===selected?" selected":"");
-    el.setAttribute("aria-label",info.name);
-    el.title=info.name;
-    el.innerHTML='<span class="num">'+(i+1)+'</span><span class="cube" style="background:'+info.hex+'"></span><span class="name">'+info.name+'</span>';
-    el.addEventListener("click",()=>{selected=n;renderHotbar()});
+    el.className="slot"+(i===selected?" selected":"");
+    el.setAttribute("aria-label",info?.name||"Empty");
+    el.title=info?.name||"Empty";
+    el.innerHTML='<span class="num">'+(i+1)+'</span>'+blockIcon(id)+'<span class="name">'+(info?.name||"")+'</span>';
+    el.addEventListener("click",()=>setSelected(i));
     hotbar.appendChild(el);
-  });
+  }
 }
-function setSelected(index){
-  selected=(index+HOTBAR_BLOCKS.length)%HOTBAR_BLOCKS.length;
-  page=Math.floor(selected/9);
+function setSelected(i){
+  selected=(i+9)%9;
   renderHotbar();
+  if(inventoryOpen)renderInventory();
 }
+function setHeldItem(id){
+  heldItem=id;
+  const cur=$("cursorItem");
+  cur.innerHTML=blockIcon(id);
+  cur.classList.toggle("hidden",!id);
+}
+function swapSlot(a,b){
+  const t=inventorySlots[a];inventorySlots[a]=inventorySlots[b];inventorySlots[b]=t;
+  saveInventory();renderInventory();renderHotbar();
+}
+function quickPut(id){
+  if(!id)return;
+  let index=inventorySlots.indexOf(id,0);
+  if(index>=9)index=-1;
+  if(index<0)index=inventorySlots.findIndex((v,i)=>i<9&&v===0);
+  if(index<0)index=selected;
+  inventorySlots[index]=id;selected=index;
+  saveInventory();renderHotbar();renderInventory();
+}
+function addCatalogItem(id){
+  const b=inventoryButton(id,id,"catalog");
+  b.addEventListener("click",e=>{
+    if(e.shiftKey){quickPut(id);return;}
+    setHeldItem(id);
+  });
+  b.addEventListener("contextmenu",e=>{e.preventDefault();quickPut(id);});
+  b.draggable=true;
+  b.addEventListener("dragstart",e=>e.dataTransfer?.setData("text/plain","catalog:"+id));
+  return b;
+}
+function drawSlot(container,index){
+  const id=inventorySlots[index],b=inventoryButton(id,index,"slot");
+  b.addEventListener("click",e=>{
+    if(e.shiftKey){
+      if(!inventorySlots[index])return;
+      const dest=index<9?
+        inventorySlots.findIndex((id,i)=>i>=9&&id===0):
+        inventorySlots.findIndex((id,i)=>i<9&&id===0);
+      if(dest>=0)swapSlot(index,dest);
+      return;
+    }
+    const prior=inventorySlots[index];
+    inventorySlots[index]=heldItem;
+    setHeldItem(prior);
+    saveInventory();renderInventory();renderHotbar();
+  });
+  b.addEventListener("contextmenu",e=>{
+    e.preventDefault();
+    if(heldItem){inventorySlots[index]=heldItem;saveInventory();renderInventory();renderHotbar();}
+    else if(inventorySlots[index]){setHeldItem(inventorySlots[index]);}
+  });
+  b.draggable=!!id;
+  b.addEventListener("dragstart",e=>e.dataTransfer?.setData("text/plain","slot:"+index));
+  b.addEventListener("dragover",e=>e.preventDefault());
+  b.addEventListener("drop",e=>{
+    e.preventDefault();
+    const entry=e.dataTransfer?.getData("text/plain")||"";
+    const [kind,val]=entry.split(":");
+    if(kind==="catalog") { inventorySlots[index]=Number(val);saveInventory();renderInventory();renderHotbar(); }
+    else if(kind==="slot")swapSlot(Number(val),index);
+  });
+  container.appendChild(b);
+}
+function renderInventory(){
+  const catalog=$("creativeBlocks"),storage=$("storageSlots"),bar=$("inventoryHotbar");
+  catalog.replaceChildren();storage.replaceChildren();bar.replaceChildren();
+  const query=$("inventorySearch").value.trim().toLowerCase();
+  const groups={
+    building:[3,4,9,10,11,12,15],
+    nature:[1,2,5,6,7,8,16],
+    decor:[13,14]
+  };
+  for(const id of MATERIALS){
+    if(inventoryFilter!=="all" && !groups[inventoryFilter]?.includes(id))continue;
+    if(query&&!BLOCKS[id].name.toLowerCase().includes(query))continue;
+    catalog.appendChild(addCatalogItem(id));
+  }
+  for(let i=9;i<36;i++)drawSlot(storage,i);
+  for(let i=0;i<9;i++)drawSlot(bar,i);
+}
+function openInventory(){
+  if(!playing||paused||menuVisible||inventoryOpen)return;
+  inventoryOpen=true;held.clear();leftHeld=false;rightHeld=false;
+  $("inventory").classList.remove("hidden");
+  $("mobile-controls").classList.add("hidden");
+  renderInventory();
+  if(!isMobile&&document.pointerLockElement===canvas)document.exitPointerLock?.();
+}
+function closeInventory(){
+  if(!inventoryOpen)return;
+  inventoryOpen=false;setHeldItem(0);
+  $("inventory").classList.add("hidden");
+  if(isMobile)$("mobile-controls").classList.remove("hidden");
+  else if(playing&&!paused)canvas.requestPointerLock?.().catch(()=>{});
+  saveInventory();
+}
+function toggleInventory(){if(inventoryOpen)closeInventory();else openInventory();}
 function renderHUD(){
   $("coordinates").textContent=player.slice(0,3).map(v=>Math.floor(v)).join(", ");
   $("fps").textContent=Math.round(fps)+" FPS";
   $("mode").firstChild.textContent=game.flying()?"FLY MODE ":"WALK MODE ";
   $("block-count").textContent=game.edits_count().toLocaleString();
-  $("block-name").textContent=target.length===7?BLOCKS[target[6]]?.name||"BLOCK":"";
+  $("block-name").textContent=target.length===7?BLOCKS[target[6]>16?8:target[6]]?.name||"BLOCK":"";
   const degrees=(yaw*180/Math.PI%360+360)%360;
   const dirs=["N","NE","E","SE","S","SW","W","NW"];
   $("compass").innerHTML=dirs[Math.round(degrees/45)%8]+' <span>•</span> '+String(Math.round(degrees)).padStart(3,"0")+'°';
@@ -491,10 +619,12 @@ function save(){
   try {
     localStorage.setItem("mine_world_"+seed,game.export_save());
     localStorage.setItem("mine_last_seed",String(seed));
+    saveInventory();
   }catch(e){toast("Storage limit reached. Cannot save additional changes.");}
 }
 function switchWorld(newSeed,loadSaved,skipOldSave=false){
   if(!skipOldSave)save();
+  if(inventoryOpen)closeInventory();
   for(const mesh of meshes.values())disposeMesh(mesh);
   meshes.clear();chunkData.clear();buildQueue.length=0;
   seed=Number(newSeed)>>>0||42042;
@@ -504,6 +634,7 @@ function switchWorld(newSeed,loadSaved,skipOldSave=false){
     if(data)game.import_save(data);
   }
   $("seedInput").value=seed;
+  loadInventory(!loadSaved);
   player=game.player();
   localStorage.setItem("mine_last_seed",String(seed));
   renderHUD();
@@ -518,7 +649,7 @@ function start(){
   toast("Welcome to your world! "+(isMobile?"Drag to look around.":"Press F to toggle flight."));
 }
 function pause(){
-  if(!playing || paused)return;
+  if(!playing || paused || inventoryOpen)return;
   paused=true;leftHeld=false;rightHeld=false;save();
   $("pause").classList.remove("hidden");
   document.exitPointerLock?.();
@@ -530,6 +661,7 @@ function resume(){
   if(!isMobile)canvas.requestPointerLock?.().catch(()=>{});
 }
 function returnMenu(){
+  if(inventoryOpen)closeInventory();
   save();paused=false;playing=false;menuVisible=true;
   $("menu").classList.remove("hidden");
   $("pause").classList.add("hidden");
@@ -553,34 +685,70 @@ function connectControls(){
   });
   $("seedInput").addEventListener("change",()=>switchWorld(Number($("seedInput").value),true));
   $("pauseButton").addEventListener("click",pause);
+  $("inventoryButton").addEventListener("click",toggleInventory);
+  $("touch-inventory").addEventListener("click",toggleInventory);
+  $("closeInventory").addEventListener("click",closeInventory);
+  $("inventorySearch").addEventListener("input",renderInventory);
+  $("inventoryTabs").addEventListener("click",e=>{
+    const button=e.target.closest("button[data-filter]");
+    if(!button)return;
+    inventoryFilter=button.dataset.filter;
+    for(const btn of $("inventoryTabs").querySelectorAll("button"))
+      btn.classList.toggle("active",btn===button);
+    renderInventory();
+  });
+  $("clearInventory").addEventListener("click",()=>{
+    if(!confirm("Clear all 36 inventory slots?"))return;
+    inventorySlots.fill(0);setHeldItem(0);saveInventory();renderInventory();renderHotbar();
+  });
+  document.addEventListener("pointermove",e=>{
+    const el=$("cursorItem");el.style.left=e.clientX+"px";el.style.top=e.clientY+"px";
+  });
+  $("inventory").addEventListener("mousedown",e=>{
+    if(e.target===$("inventory"))closeInventory();
+  });
   $("resumeButton").addEventListener("click",resume);
   $("leaveButton").addEventListener("click",returnMenu);
   $("saveButton").addEventListener("click",()=>{save();toast("WORLD SAVED");});
   $("renderDistance").addEventListener("change",e=>{renderDistance=Number(e.target.value);localStorage.setItem("mine_distance",String(renderDistance));});
   $("sensitivity").addEventListener("input",e=>{sensitivity=Number(e.target.value);localStorage.setItem("mine_sensitivity",String(sensitivity));});
   addEventListener("keydown",e=>{
-    if(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement)return;
-    if(["Space","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+    if(["Space","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)&&playing)e.preventDefault();
     if(e.code==="Escape"){
-      if(menuVisible)return;
-      if(paused)resume();else pause();
+      if(inventoryOpen)closeInventory();
+      else if(!menuVisible){if(paused)resume();else pause();}
       return;
     }
+    const inputActive=e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement;
+    if(inputActive)return;
     if(!playing||paused)return;
+    if(e.code==="KeyE"&&!e.repeat){toggleInventory();return;}
+    if(inventoryOpen)return;
     held.add(e.code);
-    if(/^Digit[1-9]$/.test(e.code))setSelected(page*9+Number(e.code.slice(5))-1);
-    if(e.code==="Tab"&&!e.repeat){page=1-page;selected=page*9;renderHotbar();toast("MATERIAL PALETTE "+(page+1)+"/2");}
-    if(e.code==="KeyF"&&!e.repeat){game.set_flying(!game.flying());toast(game.flying()?"FLIGHT MODE ENABLED":"WALK MODE ENABLED");}
+    if(/^Digit[1-9]$/.test(e.code))setSelected(Number(e.code.slice(5))-1);
+    if(e.code==="Space"&&!e.repeat){
+      const now=performance.now();
+      if(now-lastSpaceTap<330){
+        game.set_flying(!game.flying());
+        toast(game.flying()?"FLIGHT ENABLED — SHIFT descends":"FLIGHT DISABLED");
+        lastSpaceTap=-1000;
+      }else lastSpaceTap=now;
+    }
+    if(e.code==="KeyF"&&!e.repeat){
+      // A convenient accessibility fallback for flight; double Space is standard.
+      game.set_flying(!game.flying());
+      toast(game.flying()?"FLIGHT ENABLED":"FLIGHT DISABLED");
+    }
   });
   addEventListener("keyup",e=>held.delete(e.code));
   addEventListener("blur",()=>{held.clear();leftHeld=false;rightHeld=false;});
   document.addEventListener("mousemove",e=>{
-    if(document.pointerLockElement!==canvas||!playing||paused)return;
+    if(document.pointerLockElement!==canvas||!playing||paused||inventoryOpen)return;
     yaw+=e.movementX*.0025*sensitivity;
     pitch=clamp(pitch-e.movementY*.0025*sensitivity,-1.54,1.54);
   });
   canvas.addEventListener("mousedown",e=>{
-    if(isMobile||!playing||paused||menuVisible)return;
+    if(isMobile||!playing||paused||menuVisible||inventoryOpen)return;
     if(document.pointerLockElement!==canvas){canvas.requestPointerLock?.().catch(()=>{});return;}
     if(e.button===0){leftHeld=true;action(false);mouseLastAction=performance.now();}
     if(e.button===2){rightHeld=true;action(true);mouseLastAction=performance.now();}
@@ -588,18 +756,18 @@ function connectControls(){
   addEventListener("mouseup",e=>{if(e.button===0)leftHeld=false;if(e.button===2)rightHeld=false;});
   canvas.addEventListener("contextmenu",e=>e.preventDefault());
   canvas.addEventListener("wheel",e=>{
-    if(!playing||paused)return;
+    if(!playing||paused||inventoryOpen)return;
     e.preventDefault();
     setSelected(selected+(e.deltaY>0?1:-1));
   },{passive:false});
   document.addEventListener("pointerlockchange",()=>{
-    if(!isMobile&&playing&&!menuVisible&&!paused&&document.pointerLockElement!==canvas)pause();
+    if(!isMobile&&playing&&!menuVisible&&!paused&&!inventoryOpen&&document.pointerLockElement!==canvas)pause();
   });
   if(isMobile)connectTouch();
 }
 function connectTouch(){
   canvas.addEventListener("pointerdown",e=>{
-    if(!playing||paused||menuVisible||touchLook.pointer!==null)return;
+    if(!playing||paused||menuVisible||inventoryOpen||touchLook.pointer!==null)return;
     touchLook={pointer:e.pointerId,x:e.clientX,y:e.clientY};
     canvas.setPointerCapture(e.pointerId);
   });
@@ -639,8 +807,9 @@ function simulation(dt,time){
   const mx=Math.sin(yaw)*fw+Math.cos(yaw)*st;
   const mz=-Math.cos(yaw)*fw+Math.sin(yaw)*st;
   const jump=held.has("Space")||MOBILE_ACTIONS.jump;
-  const down=held.has("ControlLeft")||held.has("KeyC")?1:0;
-  game.step(dt,mx,mz,jump,held.has("ShiftLeft")||held.has("ShiftRight"),down);
+  const sneak=held.has("ShiftLeft")||held.has("ShiftRight");
+  const down=game.flying()&&sneak?1:0;
+  game.step(dt,mx,mz,jump,held.has("ControlLeft")||held.has("ControlRight"),down,sneak&&!game.flying());
   player=game.player();
   target=getTarget();
   if((leftHeld||rightHeld||MOBILE_ACTIONS.break||MOBILE_ACTIONS.place)&&time-mouseLastAction>210) {
@@ -652,11 +821,11 @@ function frameLoop(time){
   const dt=clamp((time-previousTime)/1000||.016,0,.05);previousTime=time;
   frame++;frameAccumulator+=dt;
   if(frameAccumulator>.42){fps=frame/frameAccumulator;frame=0;frameAccumulator=0;}
-  if(playing&&!paused)simulation(dt,time);
+  if(playing&&!paused&&!inventoryOpen)simulation(dt,time);
   else player=game.player();
   updateVisibleChunks();
   render(time);
-  if(playing&&!paused&&Math.floor(time/180)%2===0)renderHUD();
+  if(playing&&!paused&&!inventoryOpen&&Math.floor(time/180)%2===0)renderHUD();
   if(time-lastAutosave>5000){if(playing&&!paused)save();lastAutosave=time;}
   requestAnimationFrame(frameLoop);
 }
@@ -673,6 +842,7 @@ async function main(){
     if(data)game.import_save(data);
     player=game.player();
     $("seedInput").value=seed;
+    loadInventory(false);
     initGL();
     renderHotbar();
     connectControls();
