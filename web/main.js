@@ -589,9 +589,23 @@ function action(place=false){
     invalidateBlocks(x,z);
   }
 }
+function tintColor(hex,scale){
+  const rgb=[1,3,5].map(n=>parseInt(hex.slice(n,n+2),16));
+  return '#'+rgb.map(v=>Math.round(Math.max(0,Math.min(255,v*scale))).toString(16).padStart(2,'0')).join('');
+}
 function blockIcon(id){
   const info=BLOCKS[id];
-  return info?'<span class="cube" style="background:'+info.hex+'"></span>':'';
+  if(!info)return '';
+  // Original little voxel model — independent of any Minecraft item textures.
+  const top=id===1?'#6caa4e':id===7?'#e9f1ed':id===5||id===28?'#b89b6e':tintColor(info.hex,1.20);
+  const left=id===1?'#705239':tintColor(info.hex,.65);
+  const right=id===1?'#896544':tintColor(info.hex,.87);
+  return '<svg class="block-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false">'+
+    '<path d="M20 3 37 12 20 21 3 12Z" fill="'+top+'"/>'+
+    '<path d="M3 12 20 21 20 38 3 29Z" fill="'+left+'"/>'+
+    '<path d="M20 21 37 12 37 29 20 38Z" fill="'+right+'"/>'+
+    '<path d="M3 12 20 21 37 12M20 21V38" stroke="#000" stroke-opacity=".19" stroke-width=".8" fill="none"/>'+
+    '</svg>';
 }
 function inventoryButton(id,index,type){
   const el=document.createElement("button");
