@@ -1,5 +1,15 @@
 # MINE
 
+**Play the current MINE Alpha 0.3:** [Open the latest compiled Rust/WebAssembly build](https://raw.githack.com/Mooouse/mine/site/index.html)
+
+**GitHub Pages notice:** `https://mooouse.github.io/mine/` currently serves **Alpha 0.2**, because GitHub Pages deployment is stuck on `updating_pages`. The latest compiled game is pushed to the `site` branch and verified in headless Chrome using its live mirror link.
+
+To restore the original GitHub Pages address, repository administrator:
+1. Open **Settings → Pages → Build and deployment**.
+2. Change **Source** to **Deploy from a branch**.
+3. Choose branch **site** and folder **/(root)**; click **Save**.
+4. After the site is published, verify `ALPHA 0.3` in the menu. A force reload (Ctrl+F5) can clear the previous asset cache.
+
 An original, independent voxel sandbox built with **Rust + WebAssembly**, with a lightweight WebGL2 front end. Inspired by Horizon's Rust approach, but **not** a redistribution of Minecraft or its game assets.
 
 ### Project goals
