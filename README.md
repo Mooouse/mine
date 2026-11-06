@@ -36,11 +36,11 @@ textures/shaders are original; it does not include Minecraft assets.
 - **W / A / S / D:** move; mouse: look
 - **Space:** jump or rise while flying; press twice quickly to toggle flight
 - **Left Shift:** sneak / avoid walking off ledges, or descend while flying
-- **Left Control:** sprint; **F:** optional accessible flight toggle
+- **Left Control:** sprint; **F:** swap the selected hotbar block with the offhand
 - **Left click:** break blocks; **right click:** place the selected block
 - **Middle click:** select the targeted block for creative building
 - **1–9 / mouse wheel:** choose a hotbar slot
-- **E:** open/close the creative inventory (27 storage slots, nine hotbar slots);
+- **E:** open/close the creative inventory (27 storage slots, nine hotbar slots, offhand);
   **Esc:** close inventory / pause game
 - **Inventory:** pick any of 16 materials, click a slot to swap with the
   cursor item, right-click a catalog block to put it directly on the hotbar,
