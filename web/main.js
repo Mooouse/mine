@@ -62,7 +62,7 @@ const CHUNK=16, WORLD_HEIGHT=64;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let game,gl,worldProgram,skyProgram,lineProgram,vaoSky,vaoLine,vboLine;
 let playing=false, paused=false, menuVisible=true, selected=0;
-let minigames=null,botVao=null,botVbo=null;
+let minigames=null,botVao=null,botVbo=null,arenaWorldActive=false;
 let yaw=.24,pitch=-.13,sensitivity=1, fov=75, soundEnabled=true, debugVisible=false, renderDistance=3, target=[], player=[8,34,8], seed=42042;
 let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
@@ -891,12 +891,56 @@ function renderHUD(){
   $("compass").innerHTML=dirs[Math.round(degrees/45)%8]+' <span>•</span> '+String(Math.round(degrees)).padStart(3,"0")+'°';
 }
 function save(){
-  if(!game||minigames?.active)return;
+  if(!game||arenaWorldActive||minigames?.active)return;
   try {
     localStorage.setItem("mine_world_"+seed,game.export_save());
     localStorage.setItem("mine_last_seed",String(seed));
     saveInventory();
   }catch(e){toast("Storage limit reached. Cannot save additional changes.");}
+}
+function clearWorldGraphics(){
+  for(const mesh of meshes.values())disposeMesh(mesh);
+  meshes.clear();chunkData.clear();waterDirty.clear();buildQueue.length=0;
+}
+function enterMinigameWorld(modeId){
+  // A match is an ephemeral Rust Game instance. Never overwrite the saved sandbox.
+  if(!arenaWorldActive)save();
+  clearWorldGraphics();
+  arenaWorldActive=true;
+  const index=["spleef","tntrun","parkour","blockparty","sumo"].indexOf(modeId);
+  game=new Game(902210+Math.max(0,index)*117);
+  game.set_time(325);
+  game.set_flying(false);
+  player=game.player();
+  held.clear();leftHeld=false;rightHeld=false;
+  yaw=0;pitch=-.15;crouchBlend=0;target=[];
+  $("hud").classList.remove("hidden");
+}
+function rebuildArenaChunk(cx,cz){
+  const key=cx+","+cz;
+  chunkData.set(key,game.chunk(cx,cz));
+  if(meshes.has(key))rebuild(cx,cz);
+}
+function exitMinigameWorld(){
+  clearWorldGraphics();
+  arenaWorldActive=false;
+  game=new Game(seed);
+  const saveData=localStorage.getItem("mine_world_"+seed);
+  if(saveData)game.import_save(saveData);
+  player=game.player();target=[];held.clear();crouchBlend=0;
+  playing=false;paused=false;menuVisible=true;
+  leftHeld=false;rightHeld=false;
+  $("menu").classList.remove("hidden");
+  $("pause").classList.add("hidden");
+  $("hud").classList.add("hidden");
+  $("hud").classList.remove("help-visible","minigame-active");
+  $("mobile-controls").classList.add("hidden");
+  $("miniBotLabels").replaceChildren();
+  $("saveButton").classList.remove("hidden");
+  $("pauseTitle").textContent="Game menu";
+  $("pauseDescription").textContent="Your world is saved automatically.";
+  document.exitPointerLock?.();
+  renderHUD();
 }
 function switchWorld(newSeed,loadSaved,skipOldSave=false){
   if(!skipOldSave)save();
