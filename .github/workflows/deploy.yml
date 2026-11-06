@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -43,6 +43,8 @@ jobs:
           which google-chrome
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > /tmp/mine_http.log 2>&1 &
           node tests/browser-smoke.mjs
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v3
         with:
@@ -57,4 +59,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1
