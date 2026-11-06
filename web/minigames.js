@@ -8,7 +8,8 @@ export const MODES = Object.freeze([
   {id:"blockparty",name:"BLOCK PARTY",symbol:"▦",tag:"FIND THE COLOR",description:"Stand on the announced color before the other tiles vanish.",bots:4,time:105,accent:"#e9b6ee"},
   {id:"sumo",name:"SUMO",symbol:"✦",tag:"KNOCK THEM OUT",description:"Punch rivals off the platform. Don't get pushed over the edge.",bots:4,time:95,accent:"#f4d58f"}
 ]);
-const FLOOR=52, TOP=FLOOR+1, CENTER=8.5;
+// Terrain reaches at most y=55. Floating arenas stay above the tallest hills.
+const FLOOR=58, TOP=FLOOR+1, CENTER=8.5;
 const GRID_MIN=1,GRID_MAX=16;
 const NAMES=["NOVA","KUBO","MOSS","BYTE"];
 const COLORS=[{name:"RED",block:9,hex:"#da7160"},{name:"GREEN",block:6,hex:"#85b96e"},{name:"YELLOW",block:4,hex:"#efcd80"},{name:"DARK",block:12,hex:"#53627e"}];
@@ -392,7 +393,7 @@ export class MiniGames{
         break;
       }
     }
-    if(p[1]<FLOOR-7 || p[0]<0 || p[0]>51||p[2]<-3||p[2]>22){
+    if(p[1]<FLOOR-.7 || p[0]<0 || p[0]>51||p[2]<-3||p[2]>22){
       const pad=this.pads[this.checkpoint];
       this.api.game().teleport(pad.x,pad.y+1.08,pad.z);
       this.api.syncPlayer();
