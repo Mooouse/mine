@@ -1,0 +1,177 @@
+/* Five standalone voxel arcade modes; original Minecraft-inspired (not copied) presentation. */
+.mini-menu-button{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  width:100%;min-height:52px;padding:0 17px;
+  border:2px solid #292e25;border-top-color:#e0c8a0;border-left-color:#e0c8a0;
+  border-radius:2px;background:linear-gradient(140deg,#786549,#594d3d);
+  box-shadow:inset 1px 1px 0 #f4e4bd44,0 3px 0 #19201b9e;
+  font-weight:850;font-size:13px;letter-spacing:.07em;color:#fff2d4;
+  text-shadow:1px 2px #29271e;
+  transition:filter .15s,transform .15s;
+}
+.mini-menu-button:hover{filter:brightness(1.22);transform:translateY(-1px)}
+.mini-menu-button:active{transform:translateY(2px)}
+.mini-menu-button span:last-child{font-size:9px;letter-spacing:.045em;color:#f7d98e}
+.mini-overlay{
+  position:fixed;inset:0;z-index:22;display:flex;
+  align-items:center;justify-content:center;padding:20px;
+  background:rgba(5,13,13,.83);backdrop-filter:blur(11px);
+}
+.mini-lobby{
+  width:min(880px,100%);max-height:calc(100dvh - 30px);
+  overflow:auto;overscroll-behavior:contain;
+  padding:24px 28px 17px;
+  background:linear-gradient(155deg,#445148,#27352f 87%);
+  border:3px solid #a8baa6;border-right-color:#1a2721;border-bottom-color:#14211e;
+  border-radius:2px;box-shadow:inset 1px 1px 0 #a9c8ad67,0 15px 90px #000b;
+  scrollbar-color:#8ea38e #303c33;
+}
+.mini-lobby-heading{display:flex;align-items:start;justify-content:space-between;gap:20px}
+.mini-eyebrow{font-size:10px;font-weight:850;letter-spacing:.19em;color:#d9e9c8}
+.mini-lobby-heading h2{margin:5px 0 7px;font-size:clamp(28px,4vw,44px);line-height:1;letter-spacing:-.075em;font-weight:900;color:#fffbe9;text-shadow:2px 3px #1b2b21}
+.mini-lobby-heading h2 span{color:#e8cc8b}
+.mini-lobby-heading p{margin:0 0 12px;font-size:12px;line-height:1.55;max-width:530px;color:#c8d6c7}
+.mini-close{width:35px;height:35px;flex-shrink:0;font-size:19px;font-weight:800;color:#e7f2df;background:#5c6e5e;border:2px solid #c0cfc0;border-right-color:#2e4031;border-bottom-color:#2e4031;border-radius:2px}
+.mini-close:hover{background:#758a77}
+.mini-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px}
+.mini-card{
+  min-width:0;min-height:121px;padding:15px;
+  display:flex;gap:13px;align-items:center;text-align:left;
+  color:#f4f6e8;
+  background:linear-gradient(130deg,#36443c,#2b3830);
+  border:2px solid #9ba99a;border-bottom-color:#18281d;border-right-color:#1b2921;
+  box-shadow:inset 1px 1px #ffffff14,0 3px 0 #151e17;
+  border-radius:2px;transition:background .15s,transform .13s;
+}
+.mini-card:last-child:nth-child(odd){grid-column:span 2}
+.mini-card:hover{background:#425b46;transform:translateY(-2px);border-top-color:var(--mini-accent);border-left-color:var(--mini-accent)}
+.mini-card:active{transform:translateY(1px)}
+.mini-card-icon{
+  flex-shrink:0;display:grid;place-items:center;
+  height:57px;width:57px;
+  color:var(--mini-accent);
+  background:radial-gradient(circle at 25% 15%,#667265,#263229);
+  border:2px solid var(--mini-accent);
+  box-shadow:0 0 0 3px #1d291f99,inset 0 0 12px #0005;
+  font-size:34px;font-weight:900;
+}
+.mini-card-body{min-width:0;display:flex;flex-direction:column;gap:4px;flex:1}
+.mini-card-body strong{font-size:16px;letter-spacing:.04em;color:#fffef5}
+.mini-card-body em{font:800 9px inherit;font-style:normal;letter-spacing:.12em;color:var(--mini-accent)}
+.mini-card-body small{font-size:10px;font-weight:450;line-height:1.4;color:#c8d5c7}
+.mini-card-meta{font-size:9px;letter-spacing:.04em;color:#e1e9d1;font-weight:800;margin-top:4px}
+.mini-card-arrow{font-size:23px;color:var(--mini-accent);align-self:start}
+.mini-lobby-foot{border-top:1px solid #a4b59b4c;margin-top:20px;padding-top:11px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:9px;letter-spacing:.07em;font-weight:750;color:#c2d3ba}
+.mini-hud{position:absolute;inset:0;z-index:2;pointer-events:none}
+.mini-scoreboard{
+  position:absolute;top:12px;left:14px;max-width:min(320px,calc(100vw - 34px));
+  display:flex;flex-direction:column;gap:7px;
+  padding:12px 14px;
+  border:2px solid #bdc5b596;border-right-color:#263128b5;border-bottom-color:#182820c7;
+  border-radius:2px;background:rgba(25,38,30,.85);
+  box-shadow:0 8px 30px #0007,inset 0 1px #ecf4de38;
+  text-shadow:1px 1px #172017;
+  backdrop-filter:blur(4px);
+  pointer-events:auto;
+}
+.mini-scoretop{display:flex;justify-content:space-between;align-items:center;gap:20px}
+#miniHudTitle{font-size:15px;font-weight:950;letter-spacing:.055em;color:#fce6a7}
+#miniHudBadge{font-size:8px;font-weight:850;letter-spacing:.045em;color:#b6ceb4}
+.mini-scorestats{display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+.mini-scorestats strong{font-size:27px;line-height:1;font-weight:950;color:#fffef4;font-variant-numeric:tabular-nums}
+#miniHudBots{font-size:10px;font-weight:850;letter-spacing:.1em;color:#dfedce}
+.mini-goal{font-size:10px;letter-spacing:.07em;line-height:1.5;font-weight:800;color:#e7f0d7;max-width:280px}
+.mini-scoreactions{display:flex;gap:5px;margin-top:1px}
+.mini-scoreactions button{
+  padding:6px 11px;color:#e8f1e4;border:1px solid #94a796;
+  background:#5367598c;border-radius:2px;font-size:10px;font-weight:850;
+  letter-spacing:.06em;pointer-events:auto;
+}
+.mini-scoreactions button:hover{background:#7e9681}
+.hud.minigame-active .hotbar-wrap,
+.hud.minigame-active .block-label,
+.hud.minigame-active #inventoryButton,
+.hud.minigame-active .tips,
+.hud.minigame-active .item-toast{display:none!important}
+.hud.minigame-active .crosshair{display:block}
+#miniBotLabels{position:fixed;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.mini-bot-label{
+  position:absolute;transform:translate(-50%,-110%);
+  display:block;width:max-content;
+  border:1px solid #e7f3d55e;border-radius:2px;
+  background:#19251ddc;padding:4px 7px;
+  font-size:10px;font-weight:800;color:#f5fbe9;
+  text-shadow:1px 1px #000;box-shadow:0 2px 8px #0006;
+  letter-spacing:.07em;
+}
+.mini-result-overlay{z-index:25}
+.mini-result-card{
+  width:min(440px,100%);max-height:calc(100dvh - 30px);overflow:auto;
+  text-align:center;padding:28px;
+  background:linear-gradient(145deg,#576354,#2e3b31);
+  border:3px solid #ced0a7;border-bottom-color:#283025;border-right-color:#293528;
+  border-radius:2px;box-shadow:inset 2px 2px #ffffff2b,0 20px 80px #000b;
+}
+.mini-result-card h2{
+  margin:10px 0 3px;font-size:clamp(31px,6vw,48px);
+  line-height:1;font-weight:950;letter-spacing:-.055em;color:#eee6d0;
+  text-shadow:2px 3px #263227;
+}
+.mini-result-card h2.victory{color:#e3fbaa}
+.mini-result-card p{font-size:13px;color:#e7eee0;margin:14px 0 18px;line-height:1.5}
+.mini-result-stats{display:flex;justify-content:space-around;margin:10px 0 22px;padding:15px 0;border-top:1px solid #b0c1b057;border-bottom:1px solid #b0c1b057}
+.mini-result-stats div{display:flex;flex-direction:column;gap:5px}
+.mini-result-stats strong{font-size:21px;font-weight:850;color:#fffdeb}
+.mini-result-stats span{font-size:9px;font-weight:700;color:#d6e4d0;letter-spacing:.09em}
+.mini-result-card button{margin:6px 0;justify-content:center;gap:14px}
+.mini-result-card button span{margin-left:auto}
+@media(max-width:650px){
+  .mini-overlay{padding:7px;align-items:center}
+  .mini-lobby{padding:14px;max-height:calc(100dvh - 10px)}
+  .mini-cards{gap:7px}
+  .mini-card{padding:10px;gap:9px;min-height:107px}
+  .mini-card-icon{height:43px;width:43px;font-size:24px}
+  .mini-card-body strong{font-size:13px}
+  .mini-card-body small{font-size:9px}
+  .mini-card-meta{font-size:8px}
+  .mini-card-arrow{display:none}
+  .mini-scoreboard{top:8px;left:8px;padding:7px 9px;max-width:235px;gap:4px}
+  #miniHudTitle{font-size:12px}
+  #miniHudBadge{font-size:7px}
+  .mini-scorestats strong{font-size:21px}
+  #miniHudBots{font-size:8px}
+  .mini-goal{font-size:9px}
+  .mini-scoreactions button{font-size:8px;padding:4px 7px}
+  .mini-bot-label{font-size:8px}
+}
+@media(max-width:440px){
+  .mini-cards{grid-template-columns:1fr}
+  .mini-card:last-child:nth-child(odd){grid-column:auto}
+  .mini-card{min-height:77px}
+  .mini-card-icon{height:42px;width:42px}
+  .mini-card-body small{display:none}
+  .mini-lobby-heading h2{font-size:29px}
+  .mini-lobby-heading p{font-size:11px}
+}
+@media(orientation:landscape) and (max-height:550px){
+  .mini-overlay{padding:5px}
+  .mini-lobby{padding:10px 18px;max-height:calc(100dvh - 10px)}
+  .mini-lobby-heading h2{font-size:27px;margin:1px 0}
+  .mini-lobby-heading p{font-size:10px;margin-bottom:4px}
+  .mini-cards{gap:6px;margin-top:5px}
+  .mini-card{min-height:78px;padding:7px;gap:8px}
+  .mini-card-icon{height:40px;width:40px;font-size:23px}
+  .mini-card-body strong{font-size:12px}
+  .mini-card-body small{font-size:9px}
+  .mini-card-meta{font-size:8px}
+  .mini-lobby-foot{margin-top:8px;padding-top:5px}
+  .mini-scoreboard{top:6px;left:7px;padding:6px 9px;max-width:220px;gap:2px}
+  .mini-scoretop{gap:7px}
+  .mini-scorestats strong{font-size:18px}
+  .mini-goal{max-width:200px;font-size:8px}
+  .mini-result-card{padding:12px 22px}
+  .mini-result-card h2{margin:5px;font-size:29px}
+  .mini-result-card p{margin:8px}
+  .mini-result-stats{margin:6px 0 10px;padding:7px 0}
+  .mini-result-card button{min-height:37px;margin:3px 0}
+}
