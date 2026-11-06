@@ -1,0 +1,22 @@
+[package]
+name = "mine-web"
+version = "0.1.0"
+edition = "2021"
+description = "A browser-based voxel sandbox implemented in Rust and WebAssembly"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3"]
