@@ -68,7 +68,7 @@ impl Game {
             grounded:false, flying:false, time:90.0,
         };
         let h = game.height_at(8,8);
-        game.py = (h + 3) as f32;
+        game.py = (h + 8) as f32;
         game
     }
 
@@ -241,7 +241,8 @@ impl Game {
         self.vx += (x*speed-self.vx)*blend;
         self.vz += (z*speed-self.vz)*blend;
         if self.flying {
-            self.vy += ((if jump { 1.0 } else { 0.0 } - up)*speed - self.vy)*blend;
+            let vertical = (if jump { 1.0 } else { 0.0 }) - up;
+            self.vy += (vertical*speed-self.vy)*blend;
         } else {
             if self.grounded && jump { self.vy = 8.4; self.grounded = false; }
             self.vy = (self.vy - 24.0*dt).max(-36.0);
@@ -289,7 +290,7 @@ impl Game {
             let z=(oz+dz*d).floor() as i32;
             if (x,y,z)!=(px,py,pz) { prev=(px,py,pz);px=x;py=y;pz=z; }
             let id=self.block(x,y,z);
-            if id!=AIR && id!=WATER && id!=FLOWER {
+            if id!=AIR && id!=WATER {
                 return vec![x,y,z,prev.0,prev.1,prev.2,id as i32];
             }
         }
