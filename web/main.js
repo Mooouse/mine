@@ -962,6 +962,7 @@ function enterMinigameWorld(modeId){
   clearWorldGraphics();
   arenaWorldActive=true;
   const index=["spleef","tntrun","parkour","blockparty","sumo"].indexOf(modeId);
+  game?.free?.();
   game=new Game(902210+Math.max(0,index)*117);
   game.set_time(325);
   game.set_flying(false);
@@ -978,6 +979,7 @@ function rebuildArenaChunk(cx,cz){
 function exitMinigameWorld(){
   clearWorldGraphics();
   arenaWorldActive=false;
+  game?.free?.();
   game=new Game(seed);
   const saveData=localStorage.getItem("mine_world_"+seed);
   if(saveData)game.import_save(saveData);
