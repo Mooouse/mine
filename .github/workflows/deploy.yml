@@ -1,4 +1,4 @@
-name: Build Rust WASM and deploy
+name: Build MINE and publish browser build
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -43,6 +43,24 @@ jobs:
           which google-chrome
           python3 -m http.server 8765 --bind 127.0.0.1 --directory dist > /tmp/mine_http.log 2>&1 &
           node tests/browser-smoke.mjs
+      # Keep a fully playable, versioned static build in Git even if the
+      # GitHub Pages backend is stuck in 'updating_pages' (Nov 2026).
+      - name: Publish direct-play static build to site branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p /tmp/mine-static
+          cp -r dist/. /tmp/mine-static/
+          cd /tmp/mine-static
+          touch .nojekyll
+          git init -b site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Browser build of ${GITHUB_SHA}"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/site
+          echo "Static build: https://raw.githack.com/${GITHUB_REPOSITORY}/site/index.html"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages site
@@ -50,7 +68,10 @@ jobs:
         with:
           path: dist
 
+  # Retain an on-demand Pages retry; do not make each main-branch build
+  # hang for ten minutes while the GitHub Pages deployment service is stuck.
   deploy:
+    if: github.event_name == 'workflow_dispatch'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
