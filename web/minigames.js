@@ -167,9 +167,10 @@ export class MiniGames{
     if(this.mode.id==="parkour"){
       this.pads=[];
       for(let i=0;i<15;i++){
-        const x=3+i*2.8;
-        const z=8.5+(i===0?0:Math.sin(i*1.21)*2.3);
-        const y=FLOOR+(i%5===0?1:(i%3===1?0:2));
+        const x=3+i*3.2;
+        const z=8.5+(i===0?0:Math.sin(i*1.17)*1.75);
+        // A player jump only reaches ~1.5 blocks high; never require +2.
+        const y=FLOOR+(i%4===2?0:1);
         this.pads.push({x,z,y,checkpoint:i%4===0});
         for(let dx=-1;dx<=1;dx++)
           for(let dz=-1;dz<=1;dz++)
@@ -198,7 +199,8 @@ export class MiniGames{
       }
     }
     if(this.mode.id==="blockparty"){
-      this.safe=COLORS[0];this.phase="choose";this.phaseTimer=7.7;
+      this.safe=COLORS[0];
+      // Preserve the shared three-second round countdown.
     }
   }
   paintParty(){
