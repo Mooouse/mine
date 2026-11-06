@@ -98,6 +98,14 @@ export class MiniGames{
     g.set_time(325); // afternoon and clear daylight for fair arena visibility
     this.createArena();
     this.bots=Array.from({length:mode.bots},(_,i)=>this.makeBot(i));
+    const labels=this.$("miniBotLabels");labels.replaceChildren();
+    for(const bot of this.bots){
+      const label=document.createElement("span");
+      label.id="miniBotTag"+bot.id;
+      label.className="mini-bot-label hidden";
+      label.textContent="BOT · "+bot.name;
+      labels.appendChild(label);
+    }
     const spawn=this.getSpawn();
     g.teleport(spawn[0],spawn[1],spawn[2]);
     this.api.syncPlayer();
