@@ -116,7 +116,7 @@ vec3 palette(float m,vec3 n,vec3 p){
  if(m<11.5){float seam=step(fract(p.y*2.),.04);return mix(vec3(.71,.48,.25),vec3(.36,.22,.13),seam);}
  if(m<12.5)return vec3(.23,.27,.34);
  if(m<13.5)return vec3(1.,.84,.40);
- if(m<14.5)return vec3(.96,.43,.58);
+ if(m<14.5)return mix(vec3(.22,.55,.24),vec3(.96,.43,.58),step(.55,fract(p.y)));
  if(m<15.5)return vec3(.58,.57,.62);
  return vec3(.26,.56,.31);
 }
@@ -249,7 +249,16 @@ function facesMesh(cx,cz){
     for(let z=0;z<CHUNK;z++){
       for(let x=0;x<CHUNK;x++){
         const id=chunk[(y*CHUNK+z)*CHUNK+x];
-        if(!id || id===14)continue;
+        if(!id)continue;
+        if(id===14){
+          const wx=x0+x,wz=z0+z;
+          const stem=[[.22,.18,.22],[.78,.82,.78],[.78,.18,.78],[.22,.82,.22]];
+          const faces=[[0,2,1],[0,3,2],[2,0,1],[2,3,0]];
+          for(const f of faces)for(const v of f){
+            const p=stem[v];solid.push(wx+p[0],y+p[1],wz+p[2],0,1,0,14,1);
+          }
+          continue;
+        }
         const wx=x0+x,wz=z0+z;
         const transparent=id===8||id===10;
         const buf=transparent?trans:solid;
@@ -484,8 +493,8 @@ function save(){
     localStorage.setItem("mine_last_seed",String(seed));
   }catch(e){toast("Storage limit reached. Cannot save additional changes.");}
 }
-function switchWorld(newSeed,loadSaved){
-  save();
+function switchWorld(newSeed,loadSaved,skipOldSave=false){
+  if(!skipOldSave)save();
   for(const mesh of meshes.values())disposeMesh(mesh);
   meshes.clear();chunkData.clear();buildQueue.length=0;
   seed=Number(newSeed)>>>0||42042;
@@ -535,7 +544,7 @@ function connectControls(){
     const old=localStorage.getItem("mine_world_"+(n>>>0));
     if(old && !confirm("Create a new world with this seed? The previous save for this seed will be replaced."))return;
     localStorage.removeItem("mine_world_"+(n>>>0));
-    switchWorld(n,false);
+    switchWorld(n,false,true);
     start();
   });
   $("randomSeed").addEventListener("click",()=>{
