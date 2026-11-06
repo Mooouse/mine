@@ -46,6 +46,7 @@ jobs:
       # Keep a fully playable, versioned static build in Git even if the
       # GitHub Pages backend is stuck in 'updating_pages' (Nov 2026).
       - name: Publish direct-play static build to site branch
+        id: static
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -63,7 +64,13 @@ jobs:
           git add --force --all
           git commit -m "Browser build of ${GITHUB_SHA}"
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/site
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "Static build: https://raw.githack.com/${GITHUB_REPOSITORY}/site/index.html"
+      - name: Test published standalone browser build
+        continue-on-error: true
+        env:
+          GAME_URL: https://raw.githack.com/${{ github.repository }}/${{ steps.static.outputs.sha }}/index.html
+        run: node tests/browser-smoke.mjs
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages site
