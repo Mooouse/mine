@@ -61,6 +61,15 @@ const chunkData=new Map(), meshes=new Map(), buildQueue=[];
 const glState={camera:[0,0,0],vp:new Float32Array(16)};
 const MOBILE_ACTIONS = {jump:false,break:false,place:false};
 let glReady=false, visibleChunks=0;
+const waterDirty=new Set();
+let suppressPointerUnlockUntil=0;
+const isWater=id=>id===8||(id>=17&&id<=24);
+const waterHeight=(id,aboveWater=false)=>{
+  if(aboveWater)return 1;
+  if(id===8)return .94;
+  if(id===24)return .96;
+  return Math.max(.23,.94-(id-16)*.10);
+};
 
 function toast(message) {
   const box=$("notifications");
@@ -258,11 +267,11 @@ function facesMesh(cx,cz){
   const solid=[],trans=[];
   const x0=cx*CHUNK,z0=cz*CHUNK;
   const chunk=rawChunk(cx,cz);
-  const addFace=(buffer,x,y,z,id,face)=>{
+  const addFace=(buffer,x,y,z,id,face,height=1)=>{
     const corners=face.c;
     for(let k=0;k<6;k++){
       const c=corners[TRI[k]];
-      buffer.push(x+c[0],y+c[1],z+c[2],face.n[0],face.n[1],face.n[2],id,face.light);
+      buffer.push(x+c[0],y+(c[1]?height:0),z+c[2],face.n[0],face.n[1],face.n[2],isWater(id)?8:id,face.light);
     }
   };
   for(let y=0;y<WORLD_HEIGHT;y++){
@@ -280,15 +289,19 @@ function facesMesh(cx,cz){
           continue;
         }
         const wx=x0+x,wz=z0+z;
-        const transparent=id===8||id===10;
+        const watery=isWater(id),transparent=watery||id===10;
+        const aboveWater=watery&&isWater(blockAt(wx,y+1,wz));
+        const h=watery?waterHeight(id,aboveWater):1;
         const buf=transparent?trans:solid;
         for(const face of FACES){
           const next=blockAt(wx+face.d[0],y+face.d[1],wz+face.d[2]);
           let exposed;
-          if(id===8)exposed=next===0 || next===14;
-          else if(id===10)exposed=next!==10;
-          else exposed=next===0 || next===8 || next===10 || next===14;
-          if(exposed)addFace(buf,wx,y,wz,id,face);
+          if(watery){
+            exposed=!isWater(next) && (next===0||next===14||next===10);
+            if(face.d[1]===1)exposed=!isWater(next);
+          }else if(id===10)exposed=next!==10;
+          else exposed=next===0 || isWater(next) || next===10 || next===14;
+          if(exposed)addFace(buf,wx,y,wz,id,face,h);
         }
       }
     }
@@ -328,6 +341,27 @@ function invalidateBlocks(x,z) {
     const key=a+","+b;
     if(chunkData.has(key))chunkData.set(key,game.chunk(a,b));
     if(meshes.has(key))rebuild(a,b);
+  }
+}
+function advanceWater(time){
+  if(time-lastWaterTick<110 || !game)return;
+  lastWaterTick=time;
+  const dirty=game.tick_water(isMobile?42:72);
+  for(let i=0;i<dirty.length;i+=2){
+    const cx=dirty[i],cz=dirty[i+1],key=cx+","+cz;
+    if(chunkData.has(key))chunkData.set(key,game.chunk(cx,cz));
+    if(meshes.has(key))waterDirty.add(key);
+  }
+}
+function rebuildWaterMeshes(){
+  let left=isMobile?1:2;
+  for(const key of waterDirty){
+    if(left--<=0)break;
+    waterDirty.delete(key);
+    if(meshes.has(key)){
+      const [cx,cz]=key.split(",").map(Number);
+      rebuild(cx,cz);
+    }
   }
 }
 function updateVisibleChunks(){
@@ -589,7 +623,8 @@ function renderInventory(){
 }
 function openInventory(){
   if(!playing||paused||menuVisible||inventoryOpen)return;
-  inventoryOpen=true;held.clear();leftHeld=false;rightHeld=false;
+  inventoryOpen=true;suppressPointerUnlockUntil=performance.now()+650;
+  held.clear();leftHeld=false;rightHeld=false;
   $("inventory").classList.remove("hidden");
   $("mobile-controls").classList.add("hidden");
   renderInventory();
@@ -626,7 +661,7 @@ function switchWorld(newSeed,loadSaved,skipOldSave=false){
   if(!skipOldSave)save();
   if(inventoryOpen)closeInventory();
   for(const mesh of meshes.values())disposeMesh(mesh);
-  meshes.clear();chunkData.clear();buildQueue.length=0;
+  meshes.clear();chunkData.clear();waterDirty.clear();buildQueue.length=0;
   seed=Number(newSeed)>>>0||42042;
   game=new Game(seed);
   if(loadSaved){
@@ -761,7 +796,8 @@ function connectControls(){
     setSelected(selected+(e.deltaY>0?1:-1));
   },{passive:false});
   document.addEventListener("pointerlockchange",()=>{
-    if(!isMobile&&playing&&!menuVisible&&!paused&&!inventoryOpen&&document.pointerLockElement!==canvas)pause();
+    if(!isMobile&&playing&&!menuVisible&&!paused&&!inventoryOpen&&
+       performance.now()>suppressPointerUnlockUntil&&document.pointerLockElement!==canvas)pause();
   });
   if(isMobile)connectTouch();
 }
@@ -823,6 +859,8 @@ function frameLoop(time){
   if(frameAccumulator>.42){fps=frame/frameAccumulator;frame=0;frameAccumulator=0;}
   if(playing&&!paused&&!inventoryOpen)simulation(dt,time);
   else player=game.player();
+  if(playing&&!paused)advanceWater(time);
+  rebuildWaterMeshes();
   updateVisibleChunks();
   render(time);
   if(playing&&!paused&&!inventoryOpen&&Math.floor(time/180)%2===0)renderHUD();
@@ -832,7 +870,7 @@ function frameLoop(time){
 async function main(){
   try{
     $("loading-progress").style.width="23%";
-    const wasm=await init();
+    await init();
     $("loading-message").textContent="GENERATING A NEW WORLD";
     $("loading-progress").style.width="68%";
     const storedSeed=Number(localStorage.getItem("mine_last_seed"))||42042;
