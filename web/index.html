@@ -20,6 +20,7 @@
         <span class="pill" id="coordinates">0, 0, 0</span>
         <span class="pill desktop-only" id="fps">60 FPS</span>
       </div>
+      <button id="inventoryButton" class="icon-button" title="Inventory (E)" aria-label="Inventory"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
       <button id="pauseButton" class="icon-button" title="Pause (Esc)" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
     </header>
     <div class="compass" id="compass">N <span>•</span> 000°</div>
@@ -27,7 +28,7 @@
     <div id="block-name" class="block-label"></div>
     <div class="target-outline hidden" id="target-box"></div>
     <div class="hud-footer">
-      <div class="tips desktop-only"><span class="key">W A S D</span> move &nbsp;&nbsp;<span class="key">SPACE</span> jump &nbsp;&nbsp;<span class="key">LMB</span> break &nbsp;&nbsp;<span class="key">RMB</span> place &nbsp;&nbsp;<span class="key">F</span> fly</div>
+      <div class="tips desktop-only"><span class="key">W A S D</span> move &nbsp; <span class="key">CTRL</span> sprint &nbsp; <span class="key">SHIFT</span> sneak &nbsp; <span class="key">SPACE ×2</span> fly &nbsp; <span class="key">E</span> inventory &nbsp; <span class="key">LMB / RMB</span> break / place</div>
       <div id="hotbar" class="hotbar"></div>
       <div class="mode-text" id="mode">WALK MODE <span>•</span> <span id="block-count">0</span> BLOCKS CHANGED</div>
     </div>
@@ -36,10 +37,44 @@
   <div id="mobile-controls" class="hidden">
     <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
     <div class="mobile-right">
+      <button id="touch-inventory" class="touch-button" aria-label="Inventory">▦<small>ITEMS</small></button>
       <button id="touch-break" class="touch-button" aria-label="Break">⛏<small>BREAK</small></button>
       <button id="touch-place" class="touch-button" aria-label="Place">▣<small>PLACE</small></button>
       <button id="touch-jump" class="touch-button" aria-label="Jump">↑<small>JUMP</small></button>
     </div>
+  </div>
+
+  <div id="inventory" class="inventory-overlay hidden" role="dialog" aria-modal="true" aria-label="Creative inventory">
+    <div class="inv-window">
+      <div class="inv-header">
+        <div><div class="inv-kicker">MINE / CREATIVE MODE</div><h2>Inventory<span class="title-period">.</span></h2></div>
+        <button id="closeInventory" class="inv-close" aria-label="Close inventory" title="Close (E or Esc)">×</button>
+      </div>
+      <div class="inv-columns">
+        <section class="inv-browser">
+          <div class="inv-section-title">BLOCK LIBRARY <span>16 MATERIALS</span></div>
+          <div class="inv-tabs" id="inventoryTabs">
+            <button class="active" data-filter="all">ALL</button>
+            <button data-filter="building">BUILDING</button>
+            <button data-filter="nature">NATURE</button>
+            <button data-filter="decor">DECOR</button>
+          </div>
+          <input type="search" id="inventorySearch" placeholder="Search blocks..." aria-label="Search blocks" autocomplete="off"/>
+          <div id="creativeBlocks" class="inv-catalog-grid"></div>
+          <div class="inv-hint">CLICK to pick up • RIGHT CLICK to add • SHIFT+CLICK to quick move</div>
+        </section>
+        <section class="inv-storage">
+          <div class="inv-section-title">YOUR INVENTORY <span>27 SLOTS</span></div>
+          <div id="storageSlots" class="inv-grid inv-storage-grid"></div>
+          <div class="inv-section-title inv-hotbar-title">HOTBAR <span>1–9</span></div>
+          <div id="inventoryHotbar" class="inv-grid"></div>
+          <div class="inv-hint">Drag items between slots or click to swap them.</div>
+          <button id="clearInventory" class="inv-clear">CLEAR INVENTORY</button>
+        </section>
+      </div>
+      <div class="inv-bottom"><span>CREATIVE • UNLIMITED BLOCKS</span><span>PRESS <kbd>E</kbd> TO CLOSE</span></div>
+    </div>
+    <div id="cursorItem" class="cursor-item hidden"></div>
   </div>
 
   <div id="notifications" aria-live="polite"></div>
@@ -61,7 +96,7 @@
         <button id="newButton" class="secondary-button">CREATE NEW WORLD <span>＋</span></button>
       </div>
       <div class="seed-row"><label for="seedInput">WORLD SEED</label><input id="seedInput" type="text" inputmode="numeric" value="42042" maxlength="10"/><button id="randomSeed" title="Randomize seed" aria-label="Randomize seed">↻</button></div>
-      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.1</span></div>
+      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.2</span></div>
     </div>
     <div class="menu-scenery-caption">EXPLORE <span>•</span> CREATE <span>•</span> DISCOVER</div>
   </div>
