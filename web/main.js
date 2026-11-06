@@ -257,9 +257,13 @@ void main(){
     float density=clouds(cloudUV);
     float coverage=smoothstep(.49,.71,density);
     float fade=smoothstep(.04,.19,ray.y)*smoothstep(.03,.35,uDay);
-    vec3 cloudWhite=mix(vec3(.32,.39,.49),vec3(.98,.98,.95),clamp(uDay+.12,0.0,1.0));
-    cloudWhite+=vec3(.16,.08,.02)*warm;
-    sky=mix(sky,cloudWhite,coverage*fade*.86);
+    float cloudEdge=coverage*coverage*(3.0-2.0*coverage);
+    float fine=valueNoise(cloudUV*13.0+vec2(2.1,3.7));
+    float shade=clamp(.78+fine*.25+(density-.55)*1.1,.48,1.12);
+    vec3 cloudWhite=mix(vec3(.35,.42,.52),vec3(.98,.98,.95),clamp(uDay+.10,0.0,1.0));
+    cloudWhite*=shade;
+    cloudWhite+=vec3(.18,.085,.025)*warm;
+    sky=mix(sky,cloudWhite,cloudEdge*fade*.87);
   }
   outColor=vec4(max(sky,vec3(.0)),1.0);
 }`;
@@ -535,8 +539,15 @@ function render(time){
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);
-  for(const m of meshes.values()){
-    if(!m.trans)continue;
+  // Sort transparent chunks back-to-front to avoid distant water surfaces
+  // drawing on top of nearby glass/water as the player moves.
+  const transparentMeshes=[...meshes.values()].filter(m=>m.trans);
+  transparentMeshes.sort((a,b)=>{
+    const da=(a.cx*16+8-cx)**2+(a.cz*16+8-cz)**2;
+    const db=(b.cx*16+8-cx)**2+(b.cz*16+8-cz)**2;
+    return db-da;
+  });
+  for(const m of transparentMeshes){
     gl.bindVertexArray(m.trans.vao);
     gl.drawArrays(gl.TRIANGLES,0,m.trans.count);
   }
