@@ -56,7 +56,7 @@ let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
 let joystick={x:0,y:0,pointer:null};
 let touchLook={pointer:null,x:0,y:0};
-let mouseLastAction=0, leftHeld=false, rightHeld=false, shouldBuildMeshes=true;
+let mouseLastAction=0, leftHeld=false, rightHeld=false, shouldBuildMeshes=true, crouchBlend=0;
 const chunkData=new Map(), meshes=new Map(), buildQueue=[];
 const glState={camera:[0,0,0],vp:new Float32Array(16)};
 const MOBILE_ACTIONS = {jump:false,break:false,place:false};
@@ -485,7 +485,7 @@ function drawSelection(vp,coord){
 }
 function render(time){
   if(!glReady||!game)return;
-  const cx=player[0],cy=player[1]+1.62,cz=player[2];
+  const cx=player[0],cy=player[1]+1.62-crouchBlend*.33,cz=player[2];
   const cp=Math.cos(pitch);
   const forward=[Math.sin(yaw)*cp,Math.sin(pitch),-Math.cos(yaw)*cp];
   const eye=[cx,cy,cz];
@@ -539,7 +539,7 @@ function getLook(){
 }
 function getTarget(){
   const f=getLook();
-  return game.raycast(player[0],player[1]+1.62,player[2],...f,7);
+  return game.raycast(player[0],player[1]+1.62-crouchBlend*.33,player[2],...f,7);
 }
 function action(place=false){
   if(!playing||paused||menuVisible||inventoryOpen)return;
@@ -715,6 +715,7 @@ function switchWorld(newSeed,loadSaved,skipOldSave=false){
   meshes.clear();chunkData.clear();waterDirty.clear();buildQueue.length=0;
   seed=Number(newSeed)>>>0||42042;
   game=new Game(seed);
+  crouchBlend=0;
   if(loadSaved){
     const data=localStorage.getItem("mine_world_"+seed);
     if(data)game.import_save(data);
@@ -838,6 +839,18 @@ function connectControls(){
     if(document.pointerLockElement!==canvas){canvas.requestPointerLock?.().catch(()=>{});return;}
     if(e.button===0){leftHeld=true;action(false);mouseLastAction=performance.now();}
     if(e.button===2){rightHeld=true;action(true);mouseLastAction=performance.now();}
+    if(e.button===1){
+      // Minecraft-style creative pick block.
+      const hit=getTarget();
+      if(hit.length===7){
+        const blockId=hit[6]>16?8:hit[6];
+        if(blockId>0&&blockId<=16){
+          const existing=inventorySlots.indexOf(blockId,0);
+          if(existing>=0&&existing<9)setSelected(existing);
+          else{inventorySlots[selected]=blockId;saveInventory();renderHotbar();}
+        }
+      }
+    }
   });
   addEventListener("mouseup",e=>{if(e.button===0)leftHeld=false;if(e.button===2)rightHeld=false;});
   canvas.addEventListener("contextmenu",e=>e.preventDefault());
@@ -896,6 +909,7 @@ function simulation(dt,time){
   const jump=held.has("Space")||MOBILE_ACTIONS.jump;
   const sneak=held.has("ShiftLeft")||held.has("ShiftRight");
   const down=game.flying()&&sneak?1:0;
+  crouchBlend+=(Number(sneak&&!game.flying())-crouchBlend)*Math.min(1,dt*11);
   game.step(dt,mx,mz,jump,held.has("ControlLeft")||held.has("ControlRight"),down,sneak&&!game.flying());
   player=game.player();
   target=getTarget();
