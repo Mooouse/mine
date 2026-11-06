@@ -31,10 +31,20 @@ try{
   if(dimensions[0]<100||dimensions[1]<100)throw new Error("Game canvas is empty");
   await page.locator("#playButton").click();
   await page.locator("#hud").waitFor({state:"visible"});
-  await page.waitForTimeout(750);
+  await page.waitForTimeout(350);
+  await page.keyboard.press("e");
+  await page.locator("#inventory").waitFor({state:"visible",timeout:4000});
+  if(await page.locator("#storageSlots .inv-slot").count()!==27)throw new Error("Expected 27 storage slots");
+  if(await page.locator("#inventoryHotbar .inv-slot").count()!==9)throw new Error("Expected 9 hotbar slots");
+  if(await page.locator("#creativeBlocks .inv-slot").count()!==16)throw new Error("Expected 16 creative materials");
+  await page.locator('#creativeBlocks .inv-slot[aria-label="WATER"]').click();
+  await page.locator("#inventoryHotbar .inv-slot").nth(2).click();
+  const assigned=await page.locator("#inventoryHotbar .inv-slot").nth(2).getAttribute("aria-label");
+  if(assigned!=="WATER")throw new Error("Creative inventory transfer did not work");
+  await page.keyboard.press("Escape");
+  await page.locator("#inventory").waitFor({state:"hidden"});
   if(errors.length) throw new Error("Browser errors: "+errors.join(" | "));
-  console.log("PASS: WASM loaded, WebGL initialized, canvas dimensions",dimensions,
-    "and the game HUD became visible.");
+  console.log("PASS: WASM + WebGL2, 36-slot inventory, all creative materials, block transfer, E/Escape controls");
 }finally{
   await browser.close();
 }
