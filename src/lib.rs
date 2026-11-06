@@ -308,7 +308,7 @@ impl Game {
         false
     }
 
-    pub fn step(&mut self,dt:f32,mx:f32,mz:f32,jump:bool,sprint:bool,up:f32) {
+    pub fn step(&mut self,dt:f32,mx:f32,mz:f32,jump:bool,sprint:bool,up:f32,sneak:bool) {
         let dt = dt.clamp(0.0,0.05);
         self.time = (self.time + dt).rem_euclid(1200.0);
         let mut x=mx; let mut z=mz;
@@ -316,7 +316,7 @@ impl Game {
         if len > 1.0 { x/=len; z/=len; }
         let in_water=is_water(self.block(self.px.floor() as i32,(self.py+0.6).floor() as i32,self.pz.floor() as i32));
         let speed = if self.flying { if sprint { 16.0 } else { 9.0 } }
-                    else if in_water { 2.7 } else if sprint { 7.2 } else { 4.8 };
+                    else if in_water { 2.7 } else if sneak { 1.6 } else if sprint { 7.2 } else { 4.8 };
         let blend = (dt * if self.grounded || self.flying { 15.0 } else { 5.0 }).min(1.0);
         self.vx += (x*speed-self.vx)*blend;
         self.vz += (z*speed-self.vz)*blend;
@@ -334,12 +334,12 @@ impl Game {
         }
 
         let nx = self.px + self.vx*dt;
-        if !self.collides(nx,self.py,self.pz) { self.px=nx; }
+        if !self.collides(nx,self.py,self.pz) && !(sneak && self.grounded && !self.solid(nx.floor() as i32,(self.py-.10).floor() as i32,self.pz.floor() as i32)) { self.px=nx; }
         else if self.grounded && !self.collides(nx,self.py+1.05,self.pz) {
             self.px=nx; self.py+=1.05;
         } else { self.vx=0.0; }
         let nz = self.pz + self.vz*dt;
-        if !self.collides(self.px,self.py,nz) { self.pz=nz; }
+        if !self.collides(self.px,self.py,nz) && !(sneak && self.grounded && !self.solid(self.px.floor() as i32,(self.py-.10).floor() as i32,nz.floor() as i32)) { self.pz=nz; }
         else if self.grounded && !self.collides(self.px,self.py+1.05,nz) {
             self.pz=nz; self.py+=1.05;
         } else { self.vz=0.0; }
@@ -375,7 +375,7 @@ impl Game {
             let z=(oz+dz*d).floor() as i32;
             if (x,y,z)!=(px,py,pz) { prev=(px,py,pz);px=x;py=y;pz=z; }
             let id=self.block(x,y,z);
-            if id!=AIR && !is_water(id) {
+            if id!=AIR && id!=FLOWER {
                 return vec![x,y,z,prev.0,prev.1,prev.2,id as i32];
             }
         }
