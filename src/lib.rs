@@ -272,7 +272,7 @@ impl Game {
                         let height=if dx.abs()+dz.abs()<=1{3}else{1};
                         for k in 1..=height {
                             b[idx(col_x,(y+k) as usize,col_z)]=
-                                if (marker+(dx*7+dz*13) as u32+k as u32)%4==0{MOSS}else{COBBLE};
+                                if marker.wrapping_add((dx*7+dz*13) as u32).wrapping_add(k as u32)%4==0{MOSS}else{COBBLE};
                         }
                     }}
                 }
