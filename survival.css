@@ -1,0 +1,171 @@
+/* MINE 0.5 — original survival mode interface, compatible with the existing creative UI. */
+.world-mode-picker{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  width:100%;margin:9px 0 7px;
+}
+.world-mode{
+  min-width:0;display:flex;flex-direction:column;gap:4px;
+  align-items:flex-start;justify-content:center;
+  padding:12px 14px;text-align:left;
+  color:#d3e0d5;background:#24322bb5;
+  border:2px solid #6b8172;border-right-color:#142019;border-bottom-color:#13201b;
+  box-shadow:0 2px 0 #102017ab;
+  border-radius:2px;transition:background .15s,filter .15s;
+}
+.world-mode span{font-size:12px;line-height:1.2;font-weight:900;letter-spacing:.07em}
+.world-mode small{font-size:10px;letter-spacing:.04em;font-weight:580;color:#b4c6b3}
+.world-mode:hover{filter:brightness(1.19)}
+.world-mode.selected{background:#657c55;color:#fffee6;border-top-color:#e1efb9;border-left-color:#e1efb9}
+.world-mode.selected small{color:#f3efd6}
+.survival-vitals{
+  position:absolute;left:50%;bottom:96px;transform:translateX(-50%);
+  display:flex;justify-content:space-between;gap:32px;align-items:center;
+  width:min(430px,85vw);pointer-events:none;
+  font-size:18px;letter-spacing:2px;font-weight:900;
+  line-height:1;text-shadow:1px 2px 2px #111,0 0 8px #000;
+}
+.vital-hearts{color:#e8585b}
+.vital-hunger{color:#f0c17b}
+.vital-empty{color:#3a3c37;opacity:.83}
+.survival-inventory .inv-browser .inv-tabs,
+.survival-inventory #inventorySearch,
+.survival-inventory .inv-browser>.inv-hint,
+.survival-inventory #creativeBlocks,
+.survival-inventory .offhand-section,
+.survival-inventory #clearInventory{display:none!important}
+.survival-inventory .inv-kicker{color:#d6c28c}
+.survival-inventory .inv-browser>.inv-section-title{display:none}
+.survival-inventory .inv-storage-grid{margin-top:10px}
+.survival-inventory .inv-browser{min-width:0}
+.survival-inventory .inv-window{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-color:#a4b99b #37463e;
+  scrollbar-width:thin;
+}
+.survival-inventory .inv-hint{font-size:10px}
+.survival-craft{display:flex;flex-direction:column;gap:9px}
+.survival-craft p{
+  color:#d1dece;font-size:12px;line-height:1.5;
+  padding:8px;margin:0;background:#263a2eaa;border-left:3px solid #b8cea5;
+}
+.survival-recipe-list{
+  display:flex;flex-direction:column;gap:7px;overflow-y:auto;
+  max-height:53vh;padding-right:3px;scrollbar-color:#819482 #29362f;
+}
+.survival-recipe{
+  display:flex;gap:11px;align-items:center;text-align:left;
+  min-width:0;width:100%;padding:8px 10px;
+  border:2px solid #92a290;border-right-color:#1d2d25;border-bottom-color:#1c3026;
+  background:linear-gradient(100deg,#435148,#313f37);
+  color:#f4f3e6;border-radius:2px;
+}
+.survival-recipe:hover:not(:disabled){background:#647b5f}
+.survival-recipe:disabled{opacity:.53;filter:saturate(.35);cursor:not-allowed}
+.survival-recipe .block-icon{width:33px;height:33px;flex:0 0 33px}
+.recipe-info{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.recipe-info strong{font-size:12px;font-weight:900}
+.recipe-info small{font-size:10px;color:#d1ddc9;line-height:1.35}
+.recipe-output{font-size:11px;font-weight:950;color:#dbeaaa;white-space:nowrap}
+.survival-craft-hint{
+  padding:9px;background:#24352bcc;border:1px solid #829482;
+  font-size:10px;font-weight:900;letter-spacing:.045em;color:#dedfb1;line-height:1.4;
+}
+.survival-inventory .inv-bottom span:first-child{color:#e9c99b}
+.stack-count{
+  position:absolute;bottom:2px;right:3px;min-width:12px;
+  z-index:2;color:#fffef4;font-size:11px;font-weight:900;
+  text-shadow:1px 1px 0 #121612,-1px 1px 0 #111,1px -1px 0 #111;
+  pointer-events:none;
+}
+.slot .stack-count{bottom:4px;right:4px;font-size:13px}
+.tool-symbol{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;font-size:27px;
+  text-shadow:1px 1px #000a;filter:drop-shadow(0 1px 0 #0007);
+}
+.slot .tool-symbol{font-size:30px}
+.durability{
+  height:3px;position:absolute;left:4px;right:4px;bottom:1px;
+  background:#1f2a24;overflow:hidden;border-radius:1px;
+}
+.durability-fill{display:block;height:100%;background:#a0d96d}
+.mining-progress{
+  position:absolute;z-index:4;
+  left:50%;top:calc(50% + 20px);transform:translateX(-50%);
+  width:100px;height:6px;border:1px solid #e9eed8;
+  background:#0b1414bb;box-shadow:0 3px 8px #0009;
+  pointer-events:none;
+}
+.mining-progress>div{width:0%;height:100%;background:#c6e9a6;transition:width .05s linear}
+.survival-death-overlay{z-index:35;background:#1c0606d9;backdrop-filter:blur(6px)}
+.survival-death-panel{
+  width:min(420px,94vw);padding:30px;
+  background:#3c2525;border:3px solid #b88e85;border-bottom-color:#29161b;border-right-color:#29151b;
+  box-shadow:0 18px 70px #0009;text-align:center;color:#f7ebdf;
+}
+.survival-death-panel h2{
+  color:#f3b2a1;font-size:clamp(34px,5vw,54px);
+  font-weight:950;margin:10px 0;letter-spacing:-.05em
+}
+.survival-death-panel p{font-size:13px;line-height:1.5;color:#e5c8bf;margin-bottom:20px}
+.survival-death-panel button{width:100%;margin:6px 0}
+@media(max-width:650px){
+  .survival-vitals{bottom:72px;width:min(330px,87vw);font-size:14px;gap:8px;letter-spacing:1px}
+  .survival-craft p{font-size:10px}
+  .survival-recipe-list{max-height:43vh}
+  .survival-recipe{padding:6px 8px;gap:6px}
+}
+@media(orientation:landscape) and (max-height:550px){
+  .survival-vitals{bottom:59px;left:48%;font-size:12px;max-width:260px}
+  .survival-recipe-list{max-height:36vh}
+  .world-mode{padding:7px 11px}
+  .world-mode small{font-size:9px}
+}
+
+/* Position-based crafting UI (Alpha 0.6) */
+.craft-workbench-ui{
+  margin:2px 0 13px;padding:12px;
+  display:flex;align-items:center;justify-content:center;gap:15px;
+  border:2px solid #a4b5a1;border-bottom-color:#344138;border-right-color:#304136;
+  background:linear-gradient(140deg,#566756,#34453a);
+}
+.craft-section-caption{font-size:10px;font-weight:900;letter-spacing:.1em;color:#eff2d8;margin-bottom:8px}
+.craft-grid{display:grid;grid-template-columns:repeat(3,38px);gap:3px;min-height:123px}
+.craft-grid.portable{grid-template-columns:repeat(2,38px);min-height:79px}
+.craft-grid .inv-slot,.craft-output-column .inv-slot{position:relative;width:38px;height:38px;min-width:38px;padding:1px}
+.craft-grid .inv-slot:not(:disabled):hover{outline:1px solid #e4edca}
+.craft-grid-column{display:flex;flex-direction:column}
+.craft-arrow{font-size:25px;font-weight:900;color:#eddfb1;text-shadow:1px 2px #263527}
+.craft-output-column{display:flex;flex-direction:column;align-items:center}
+.craft-output-column .craft-result{width:52px;height:52px;background:#688063;border-color:#d7e6bc}
+.craft-output-column .craft-result:disabled{opacity:.48;background:#25382f}
+.craft-output-column .craft-result .block-icon{width:38px;height:38px}
+.craft-output-column .craft-result .tool-symbol{font-size:36px}
+.craft-recipe-caption{border-top:1px solid #a0b29673;padding-top:10px}
+@media(max-width:450px){
+  .craft-workbench-ui{padding:8px;gap:9px}
+  .craft-grid{grid-template-columns:repeat(3,34px)}
+  .craft-grid.portable{grid-template-columns:repeat(2,34px)}
+  .craft-grid .inv-slot{width:34px;height:34px;min-width:34px}
+}
+
+
+/* Wildlife projection labels; world-relative positions are managed by WebGL camera. */
+#wildlifeLabels{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.wildlife-name{
+  position:absolute;transform:translate(-50%,-100%);
+  display:flex;flex-direction:column;gap:3px;align-items:center;
+  white-space:nowrap;padding:4px 7px 5px;
+  background:#17251bcf;border:1px solid #9eaf8a66;border-radius:2px;
+  box-shadow:0 2px 8px #0008;color:#e9eed6;
+  text-shadow:1px 1px #071109;
+}
+.wildlife-name strong{font-size:9px;line-height:1.1;letter-spacing:.05em;font-weight:850}
+.wild-hp{display:block;width:64px;height:3px;background:#532d33}
+.wild-hp i{display:block;height:100%;background:#9cd175;transition:width .12s linear}
+@media(max-width:650px){
+  .wildlife-name{padding:3px 5px}
+  .wildlife-name strong{font-size:8px}
+  .wild-hp{width:42px}
+}

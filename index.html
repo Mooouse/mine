@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0c151b" />
+  <meta name="description" content="MINE — a procedurally generated voxel sandbox running on Rust and WebAssembly." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="ui-v2.css" />
+  <link rel="stylesheet" href="minigames.css" />
+  <link rel="stylesheet" href="survival.css" />
+  <title>MINE — Build your own world</title>
+</head>
+<body>
+  <canvas id="game" aria-label="3D voxel sandbox"></canvas>
+
+  <div id="hud" class="hud hidden">
+    <header class="topbar">
+      <div class="brand-line"><div class="brand-mark">M</div><div><strong>MINE</strong><small>WORLD EXPLORER</small></div></div>
+      <div class="top-pills">
+        <span class="pill desktop-only"><span class="online-dot"></span> RUST / WASM</span>
+        <span class="pill" id="coordinates">0, 0, 0</span>
+        <span class="pill desktop-only" id="fps">60 FPS</span>
+      </div>
+      <button id="inventoryButton" class="icon-button" title="Inventory (E)" aria-label="Inventory"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+      <button id="pauseButton" class="icon-button" title="Pause (Esc)" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+    </header>
+    <div id="survivalVitals" class="survival-vitals hidden" aria-live="off"><div id="survivalHearts" class="vital-hearts">♥♥♥♥♥♥♥♥♥♥</div><div id="survivalHunger" class="vital-hunger">◆◆◆◆◆◆◆◆◆◆</div></div>
+    <div id="miningProgress" class="mining-progress hidden"><div id="miningProgressBar"></div></div>
+    <div id="debugOverlay" class="debug-overlay hidden" aria-live="off"></div>
+    <div id="itemToast" class="item-toast hidden"></div>
+    <div id="miniHud" class="mini-hud hidden" aria-live="polite">
+      <div class="mini-scoreboard">
+        <div class="mini-scoretop"><span id="miniHudTitle">SPLEEF</span><span id="miniHudBadge">OFFLINE · AI MATCH</span></div>
+        <div class="mini-scorestats"><strong id="miniHudTime">1:30</strong><span id="miniHudBots">4 BOTS LEFT</span></div>
+        <div id="miniHudGoal" class="mini-goal">BREAK THE FLOOR</div>
+        <div class="mini-scoreactions"><button id="miniHelpButton" type="button">RULES</button><button id="miniScoreBack" type="button">EXIT</button></div>
+      </div>
+    </div>
+    <div class="compass" id="compass">N <span>•</span> 000°</div>
+    <div class="crosshair"><span></span><span></span><span></span><span></span></div>
+    <div id="block-name" class="block-label"></div>
+    <div class="target-outline hidden" id="target-box"></div>
+    <div class="hud-footer">
+      <div class="tips desktop-only" id="controlsHint"><span class="key">W A S D</span> move &nbsp; <span class="key">CTRL</span> sprint &nbsp; <span class="key">SHIFT</span> sneak &nbsp; <span class="key">SPACE ×2</span> fly &nbsp; <span class="key">E</span> inventory &nbsp; <span class="key">F</span> offhand &nbsp; <span class="key">LMB / RMB</span> break / place</div>
+      <div class="hotbar-wrap"><button id="offhandHud" class="offhand-hud" title="Offhand (F)" aria-label="Offhand"></button><div id="hotbar" class="hotbar"></div></div>
+      <div class="mode-text" id="mode">WALK MODE <span>•</span> <span id="block-count">0</span> BLOCKS CHANGED</div>
+    </div>
+  </div>
+
+  <div id="mobile-controls" class="hidden">
+    <div id="joystick" class="joystick"><div id="stick" class="stick"></div></div>
+    <div class="mobile-right">
+      <button id="touch-inventory" class="touch-button" aria-label="Inventory">▦<small>ITEMS</small></button>
+      <button id="touch-break" class="touch-button" aria-label="Break">⛏<small>BREAK</small></button>
+      <button id="touch-place" class="touch-button" aria-label="Place">▣<small>PLACE</small></button>
+      <button id="touch-jump" class="touch-button" aria-label="Jump">↑<small>JUMP</small></button>
+    </div>
+  </div>
+
+  <div id="inventory" class="inventory-overlay hidden" role="dialog" aria-modal="true" aria-label="Creative inventory">
+    <div class="inv-window">
+      <div class="inv-header">
+        <div><div class="inv-kicker" id="inventoryKicker">CREATIVE WORLD</div><h2 id="inventoryTitle">Inventory</h2></div>
+        <button id="closeInventory" class="inv-close" aria-label="Close inventory" title="Close (E or Esc)">×</button>
+      </div>
+      <div class="inv-columns">
+        <section class="inv-browser">
+          <div class="inv-section-title">BLOCK LIBRARY <span>24 MATERIALS</span></div>
+          <div class="inv-tabs" id="inventoryTabs">
+            <button class="active" data-filter="all">ALL</button>
+            <button data-filter="building">BUILDING</button>
+            <button data-filter="nature">NATURE</button>
+            <button data-filter="decor">DECOR</button>
+          </div>
+          <input type="search" id="inventorySearch" placeholder="Search blocks..." aria-label="Search blocks" autocomplete="off"/>
+          <div id="creativeBlocks" class="inv-catalog-grid"></div>
+          <div id="survivalCraft" class="survival-craft hidden">
+            <p>Move items from your backpack into the crafting grid. Click the output to craft. A nearby workbench unlocks 3×3 recipes.</p>
+            <div class="craft-workbench-ui">
+              <div class="craft-grid-column">
+                <div class="craft-section-caption" id="craftGridTitle">CRAFTING · 2×2</div>
+                <div id="craftGrid" class="craft-grid" role="group" aria-label="Crafting grid"></div>
+              </div>
+              <div class="craft-arrow" aria-hidden="true">➜</div>
+              <div class="craft-output-column">
+                <span class="craft-section-caption">RESULT</span>
+                <button id="craftResult" class="inv-slot craft-result" type="button" aria-label="Crafting result"></button>
+              </div>
+            </div>
+            <div class="craft-section-caption craft-recipe-caption">RECIPE BOOK · QUICK CRAFT</div>
+            <div id="survivalRecipeList" class="survival-recipe-list"></div>
+            <div class="survival-craft-hint" id="survivalBenchHint">PORTABLE CRAFTING • PLACE A WORKBENCH FOR TOOLS</div>
+          </div>
+          <div class="inv-hint">CLICK to pick up • RIGHT CLICK to add • SHIFT+CLICK to quick move</div>
+        </section>
+        <section class="inv-storage">
+          <div class="inv-section-title">YOUR INVENTORY <span>27 SLOTS</span></div>
+          <div id="storageSlots" class="inv-grid inv-storage-grid"></div>
+          <div class="inv-section-title inv-hotbar-title">HOTBAR <span>1–9</span></div>
+          <div id="inventoryHotbar" class="inv-grid"></div>
+          <div class="offhand-section"><div class="inv-section-title">OFFHAND <span>PRESS F TO SWAP</span></div><div id="inventoryOffhand"></div></div>
+          <div class="inv-hint">Drag items between slots or click to swap them.</div>
+          <button id="clearInventory" class="inv-clear">CLEAR INVENTORY</button>
+        </section>
+      </div>
+      <div class="inv-bottom"><span>CREATIVE • UNLIMITED MATERIALS</span><span>PRESS <kbd>E</kbd> TO CLOSE</span></div>
+    </div>
+    <div id="cursorItem" class="cursor-item hidden"></div>
+  </div>
+
+  <div id="miniBotLabels" aria-hidden="true"></div>
+  <div id="wildlifeLabels" aria-hidden="true"></div>
+  <div id="particles" aria-hidden="true"></div>
+  <div id="notifications" aria-live="polite"></div>
+
+  <div id="menu" class="menu-screen">
+    <div class="menu-vignette"></div>
+    <div class="menu-content">
+      <div class="eyebrow"><span class="online-dot"></span> A NEW WORLD BEGINS HERE</div>
+      <h1>MINE<span class="title-period">.</span></h1>
+      <p class="tagline">EXPLORE • BUILD • CREATE</p>
+      <div class="menu-separator"></div>
+      <div class="menu-info">
+        <div><strong>∞</strong><span>PROCEDURAL WORLD</span></div>
+        <div><strong>24</strong><span>BLOCK MATERIALS</span></div>
+        <div><strong>3D</strong><span>SANDBOX</span></div>
+      </div>
+      <div class="world-mode-picker" id="worldModePicker" role="group" aria-label="World game mode">
+        <button type="button" class="world-mode selected" data-world-mode="creative" aria-pressed="true"><span>✦ CREATIVE</span><small>Unlimited building</small></button>
+        <button type="button" class="world-mode" data-world-mode="survival" aria-pressed="false"><span>♥ SURVIVAL</span><small>Craft · gather · survive</small></button>
+      </div>
+      <div class="menu-actions">
+        <button id="playButton" class="primary-button"><span>ENTER THE WORLD</span><span class="arrow">↗</span></button>
+        <button id="miniGamesButton" class="mini-menu-button"><span>✦ &nbsp; MINIGAMES</span><span>5 ARENAS &nbsp; ↗</span></button>
+        <button id="newButton" class="secondary-button">CREATE NEW WORLD <span>＋</span></button>
+      </div>
+      <div class="seed-row"><label for="seedInput">WORLD SEED</label><input id="seedInput" type="text" inputmode="numeric" value="42042" maxlength="10"/><button id="randomSeed" title="Randomize seed" aria-label="Randomize seed">↻</button></div>
+      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.6 · LIVING WORLD</span></div>
+    </div>
+    <div class="menu-scenery-caption">EXPLORE <span>•</span> CREATE <span>•</span> DISCOVER</div>
+  </div>
+
+  <div id="miniLobby" class="mini-overlay hidden" role="dialog" aria-modal="true" aria-label="Minigames">
+    <section class="mini-lobby">
+      <div class="mini-lobby-heading">
+        <div><span class="mini-eyebrow">MINE ARCADE • OFFLINE</span><h2>Choose your game<span>.</span></h2>
+          <p>Five fast voxel challenges against computer-controlled opponents. No account or connection required.</p></div>
+        <button id="miniClose" class="mini-close" aria-label="Close minigames">✕</button>
+      </div>
+      <div id="miniCards" class="mini-cards"></div>
+      <div class="mini-lobby-foot"><span>NO REAL PLAYERS · 4 COMPUTER BOTS PER MATCH</span><span>WASD · SPACE · MOUSE</span></div>
+    </section>
+  </div>
+  <div id="survivalDeath" class="mini-overlay survival-death-overlay hidden" role="dialog" aria-modal="true" aria-label="Survival game over">
+    <section class="survival-death-panel">
+      <div class="mini-eyebrow">MINE · SURVIVAL</div>
+      <h2>YOU DIED</h2>
+      <p>Respawn and continue exploring. Your backpack stays with you.</p>
+      <button id="survivalRespawn" class="primary-button">RESPAWN <span>↗</span></button>
+      <button id="survivalDeathMenu" class="secondary-button">SAVE &amp; RETURN TO MENU <span>←</span></button>
+    </section>
+  </div>
+
+  <div id="miniResult" class="mini-overlay mini-result-overlay hidden" role="dialog" aria-modal="true" aria-label="Minigame results">
+    <section class="mini-result-card">
+      <div class="mini-eyebrow">MATCH FINISHED · <span id="miniResultMode">SPLEEF</span></div>
+      <h2 id="miniResultTitle">ROUND OVER</h2>
+      <p id="miniResultDetail">Game ended.</p>
+      <div class="mini-result-stats"><div><strong id="miniResultTime">0s</strong><span>ROUND TIME</span></div>
+        <div><strong id="miniResultBots">0 remaining</strong><span>COMPUTER RIVALS</span></div></div>
+      <button id="miniReplay" class="primary-button">PLAY AGAIN <span>↗</span></button>
+      <button id="miniChoose" class="secondary-button">CHOOSE ANOTHER MODE <span>▦</span></button>
+      <button id="miniReturn" class="secondary-button">MAIN MENU <span>←</span></button>
+    </section>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-overline">MINE</div>
+      <h2 id="pauseTitle">Game menu</h2>
+      <p id="pauseDescription">Your world is saved automatically.</p>
+      <button id="resumeButton" class="primary-button"><span>Back to game</span><span class="arrow">↗</span></button>
+      <button id="saveButton" class="secondary-button">Save world <span>✓</span></button>
+      <button id="leaveButton" class="secondary-button">Save &amp; quit to title <span>←</span></button>
+      <div class="setting-row"><label for="renderDistance">RENDER DISTANCE</label><select id="renderDistance"><option value="2">LOW (5 CHUNKS)</option><option value="3" selected>MEDIUM (7 CHUNKS)</option><option value="4">HIGH (9 CHUNKS)</option><option value="5">ULTRA (11 CHUNKS)</option></select></div>
+      <div class="setting-row"><label for="sensitivity">MOUSE SENSITIVITY</label><input id="sensitivity" type="range" min="0.5" max="2.5" step="0.1" value="1.0"/></div>
+      <div class="setting-row"><label for="fovRange">FIELD OF VIEW</label><input id="fovRange" type="range" min="55" max="105" step="5" value="75" /></div>
+      <div class="setting-row"><label for="soundToggle">GAME SOUNDS</label><input id="soundToggle" type="checkbox" checked /></div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-screen">
+    <div class="loading-logo">M<span>.</span></div>
+    <div id="loading-message">INITIALIZING RUST ENGINE</div>
+    <div class="loading-track"><div id="loading-progress"></div></div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
