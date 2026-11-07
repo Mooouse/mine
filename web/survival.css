@@ -149,3 +149,23 @@
   .craft-grid.portable{grid-template-columns:repeat(2,34px)}
   .craft-grid .inv-slot{width:34px;height:34px;min-width:34px}
 }
+
+
+/* Wildlife projection labels; world-relative positions are managed by WebGL camera. */
+#wildlifeLabels{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.wildlife-name{
+  position:absolute;transform:translate(-50%,-100%);
+  display:flex;flex-direction:column;gap:3px;align-items:center;
+  white-space:nowrap;padding:4px 7px 5px;
+  background:#17251bcf;border:1px solid #9eaf8a66;border-radius:2px;
+  box-shadow:0 2px 8px #0008;color:#e9eed6;
+  text-shadow:1px 1px #071109;
+}
+.wildlife-name strong{font-size:9px;line-height:1.1;letter-spacing:.05em;font-weight:850}
+.wild-hp{display:block;width:64px;height:3px;background:#532d33}
+.wild-hp i{display:block;height:100%;background:#9cd175;transition:width .12s linear}
+@media(max-width:650px){
+  .wildlife-name{padding:3px 5px}
+  .wildlife-name strong{font-size:8px}
+  .wild-hp{width:42px}
+}
