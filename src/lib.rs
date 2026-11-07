@@ -62,6 +62,7 @@ fn hash(x:i32,z:i32,seed:u32) -> u32 {
 #[wasm_bindgen]
 pub struct Game {
     seed: u32,
+    generation:u8,
     noise: Noise,
     chunks: HashMap<i64, Vec<u8>>,
     edits: HashMap<(i32,i32,i32),u8>,
@@ -87,7 +88,7 @@ impl Game {
     pub fn new(seed: u32) -> Game {
         let seed = if seed == 0 { 42042 } else { seed };
         let mut game = Game {
-            seed, noise: Noise::new(seed), chunks: HashMap::new(),
+            seed,generation:2, noise: Noise::new(seed), chunks: HashMap::new(),
             edits: HashMap::new(),
             flow_queue: VecDeque::new(), flow_pending: HashSet::new(),
             flow_dirty: HashSet::new(),
@@ -250,6 +251,71 @@ impl Game {
                 } else if biome == 0 && roll % 42 == 2 && h < 38 {
                     b[idx(lx,(h+1) as usize,lz)] = FLOWER;
                 }
+            }
+        }
+        // Version 2 worlds get additional deterministic landmarks and
+        // geological details. Generation-1 saves keep their exact old terrain.
+        if self.generation>=2 {
+            let marker=hash(cx,cz,self.seed ^ 0x8f28_a16b);
+            // Small stone/moss boulders create recognizable rock formations.
+            if marker%7==2 {
+                let lx=5+((marker>>7)%6) as i32;
+                let lz=5+((marker>>11)%6) as i32;
+                let wx=cx*16+lx,wz=cz*16+lz;
+                let base=self.height_at(wx,wz);
+                if base>SEA+2 && base<HEIGHT as i32-8 {
+                    for dx in -2i32..=2 {for dz in -2i32..=2{
+                        if dx*dx+dz*dz>5 {continue;}
+                        let y=self.height_at(wx+dx,wz+dz);
+                        if (y-base).abs()>1{continue;}
+                        let col_x=(lx+dx) as usize,col_z=(lz+dz) as usize;
+                        let height=if dx.abs()+dz.abs()<=1{3}else{1};
+                        for k in 1..=height {
+                            b[idx(col_x,(y+k) as usize,col_z)]=
+                                if (marker+(dx*7+dz*13) as u32+k as u32)%4==0{MOSS}else{COBBLE};
+                        }
+                    }}
+                }
+            }
+            // Rare abandoned stone outlooks, with a small illuminated center.
+            if marker%29==8 {
+                let wx=cx*16+8,wz=cz*16+8;
+                let h=self.height_at(wx,wz);
+                let mut flat=true;
+                for dx in -2..=2 {for dz in -2..=2 {
+                    if (self.height_at(wx+dx,wz+dz)-h).abs()>1{flat=false;}
+                }}
+                if flat && h>SEA+2 && h<HEIGHT as i32-8 && self.biome(wx,wz)!=1{
+                    for dx in -2i32..=2 {for dz in -2i32..=2{
+                        let lx=(8+dx) as usize,lz=(8+dz) as usize;
+                        for iy in h+1..=h+4 {
+                            let old=idx(lx,iy as usize,lz);
+                            b[old]=AIR; // clear vegetation only inside the footprint
+                        }
+                        b[idx(lx,(h+1) as usize,lz)]=
+                            if (dx+dz)&1==0 {COBBLE}else{MOSS};
+                    }}
+                    for (dx,dz) in [(-2,-2),(-2,2),(2,-2),(2,2)]{
+                        for k in 2..=4 {
+                            b[idx((8+dx) as usize,(h+k) as usize,(8+dz) as usize)]=COBBLE;
+                        }
+                    }
+                    b[idx(8,(h+3) as usize,8)]=GLOWSTONE;
+                }
+            }
+            // Glowing cave minerals, embedded far below the surface.
+            if marker%18==5 {
+                let x=6+((marker>>4)%5) as usize;
+                let z=6+((marker>>13)%5) as usize;
+                let y=(8+((marker>>19)%10)) as usize;
+                for dx in -2i32..=2 {for dz in -2i32..=2 {
+                    if dx*dx+dz*dz>5 {continue;}
+                    let xx=(x as i32+dx) as usize;
+                    let zz=(z as i32+dz) as usize;
+                    if b[idx(xx,y,zz)]!=STONE{continue;}
+                    b[idx(xx,y,zz)]=if dx.abs()+dz.abs()<=1{AIR}
+                        else if ((dx*13+dz*7) as u32 ^ marker)%3==0 {GLOWSTONE}else{COBBLE};
+                }}
             }
         }
         b
@@ -767,7 +833,7 @@ impl Game {
 
     pub fn export_save(&self)->String {
         // Stable versioned, whitespace-free format; edited blocks only.
-        let mut s = format!("M1|{}|{}|{}|{}|{}|",self.seed,self.px,self.py,self.pz,self.time);
+        let mut s = format!("M{}|{}|{}|{}|{}|{}|",self.generation,self.seed,self.px,self.py,self.pz,self.time);
         for ((x,y,z),v) in &self.edits {
             s.push_str(&format!("{},{},{},{};",x,y,z,v));
         }
@@ -776,7 +842,8 @@ impl Game {
 
     pub fn import_save(&mut self,txt:&str) -> bool {
         let mut parts=txt.splitn(7,'|');
-        if parts.next()!=Some("M1") { return false; }
+        let version=parts.next();
+        if version!=Some("M1")&&version!=Some("M2"){return false;}
         let seed=parts.next().and_then(|v|v.parse::<u32>().ok());
         if seed!=Some(self.seed) { return false; }
         let px=parts.next().and_then(|v|v.parse::<f32>().ok());
@@ -786,6 +853,14 @@ impl Game {
         let data=parts.next();
         if let (Some(px),Some(py),Some(pz),Some(time),Some(data))=(px,py,pz,time,data) {
             if px.is_finite() && py.is_finite() && pz.is_finite() && time.is_finite() {
+                let target_generation=if version==Some("M1"){1}else{2};
+                if self.generation!=target_generation{
+                    self.chunks.clear();
+                    self.flow_queue.clear();
+                    self.flow_pending.clear();
+                    self.flow_dirty.clear();
+                    self.generation=target_generation;
+                }
                 self.teleport(px,py,pz);
                 self.time=time.rem_euclid(1200.0);
                 for r in data.split(';') {
@@ -837,6 +912,23 @@ mod tests {
         creative.teleport(8.5,70.0,8.5);
         for _ in 0..180{creative.step(0.04,0.0,0.0,false,false,0.0,false);}
         assert_eq!(creative.survival_status(),vec![20,20,0]);
+    }
+    #[test]
+    fn legacy_terrain_keeps_original_world_generation() {
+        let mut modern=Game::new(665);
+        let updated=modern.export_save();
+        assert!(updated.starts_with("M2|"));
+        let old=updated.replacen("M2|","M1|",1);
+        let mut legacy=Game::new(665);
+        assert!(legacy.import_save(&old));
+        assert_eq!(legacy.generation,1);
+        assert!(legacy.export_save().starts_with("M1|"));
+        let mut copied=Game::new(665);
+        assert!(copied.import_save(&updated));
+        assert_eq!(copied.generation,2);
+        for (x,z) in [(0,0),(16,16),(-22,18)]{
+            assert_eq!(modern.height_at(x,z),copied.height_at(x,z));
+        }
     }
     #[test]
     fn generated_world_is_deterministic() {
