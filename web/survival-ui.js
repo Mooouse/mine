@@ -36,6 +36,8 @@ export class SurvivalUI {
       this.refreshHUD();
     });
     $("survivalDeathMenu").addEventListener("click",()=>{
+      // Restore a valid spawn state before saving and returning to the title.
+      this.api.game().survival_respawn();
       $("survivalDeath").classList.add("hidden");
       this.api.returnMenu();
     });
@@ -199,7 +201,7 @@ export class SurvivalUI {
       food.setAttribute("aria-label","Hunger "+hunger+" of 20");
       this.lastStatus=state;
     }
-    if(status[2]&&!this.api.isDead()){
+    if(status[2]&&!this.api.isDead()&&this.api.isPlaying()){
       $("survivalDeath").classList.remove("hidden");
       this.api.die();
     }
