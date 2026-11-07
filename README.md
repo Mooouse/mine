@@ -1,6 +1,6 @@
 # MINE
 
-**Play the current MINE Alpha 0.4:** [Open the latest compiled Rust/WebAssembly build](https://raw.githack.com/Mooouse/mine/site/index.html)
+**Play the current MINE Alpha 0.5:** [Open the latest compiled Rust/WebAssembly build](https://raw.githack.com/Mooouse/mine/site/index.html)
 
 **GitHub Pages notice:** `https://mooouse.github.io/mine/` currently serves **Alpha 0.2**, because GitHub Pages deployment is stuck on `updating_pages`. The latest compiled game is pushed to the `site` branch and verified in headless Chrome using its live mirror link.
 
@@ -8,11 +8,38 @@ To restore the original GitHub Pages address, repository administrator:
 1. Open **Settings → Pages → Build and deployment**.
 2. Change **Source** to **Deploy from a branch**.
 3. Choose branch **site** and folder **/(root)**; click **Save**.
-4. After the site is published, verify `ALPHA 0.4` in the menu. A force reload (Ctrl+F5) can clear the previous asset cache.
+4. After the site is published, verify `ALPHA 0.5` in the menu. A force reload (Ctrl+F5) can clear the previous asset cache.
 
 An original, independent voxel sandbox built with **Rust + WebAssembly**, with a lightweight WebGL2 front end. Inspired by Horizon's Rust approach, but **not** a redistribution of Minecraft or its game assets.
 
-## MINE ARCADE — five mini-games (Alpha 0.4)
+## SURVIVAL — playable milestone (Alpha 0.5)
+
+The title screen has **CREATIVE** and **SURVIVAL** selectors. They use
+**separate worlds and inventories for each seed**, preserving existing
+creative worlds under their original localStorage keys.
+
+Survival rules are authoritative in **Rust/WebAssembly**:
+
+- **36 inventory slots** (9 hotbar, 27 backpack), counted item stacks,
+  cursor transfers and persisted survival stats.
+- **Hold left mouse** or touch **BREAK** to mine. Harder blocks take longer,
+  rock requires a pick, and tools have limited durability.
+- **E** opens a recipe book: logs become planks; planks produce sticks and a
+  workbench; a nearby placed workbench unlocks pickaxes, axes and shovels.
+- **Right click** places a hotbar block (consumes one), interacts with a
+  workbench, or eats food if holding forest berries.
+- Health, hunger, falling damage, exhaustion, healing and respawn.
+  Leaves may drop berries; press **R** to eat when hungry.
+- Continuous autosaving plus save-on-tab-close and save-on-background.
+- Survival saves and legacy creative world saves never share a storage key.
+  All five offline minigames remain available without affecting either.
+
+This is an incremental survival implementation, not complete Minecraft
+feature parity. Mobs, farming, combat, advanced lighting and multiplayer
+remain milestones described in
+[docs/clean-room-voxel-roadmap.md](docs/clean-room-voxel-roadmap.md).
+
+## MINE ARCADE — five mini-games (Alpha 0.5)
 
 Choose **MINIGAMES** from the title screen. All matches are **offline** and
 feature four clearly labeled AI bots with animated blocky avatars; no real
@@ -53,18 +80,18 @@ mkdir -p dist && cp -r web/. dist/ && cp -r pkg dist/pkg
 cd dist && python3 -m http.server 8000
 ```
 
-Open http://localhost:8000 after building, or use the hosted GitHub Pages site.
+Open http://localhost:8000 after building, or use the static build link above.
 
-GitHub Actions compiles and deploys to GitHub Pages.
+GitHub Actions runs Rust + browser tests and publishes a compiled site branch; the optional GitHub Pages deploy may be unavailable.
 
 ### Credits and rights
 This is a standalone sandbox, not affiliated with Minecraft or Mojang.
 No Minecraft textures, code, or downloadable assets are included.
 For background inspiration, see [Horizon](https://github.com/horizon-rust/horizon) (MIT).
 
-## Alpha 0.4 — controls and features
+## Alpha 0.5 — controls and features
 
-The game is a standalone **creative voxel sandbox**. Its source code and
+The game is an original **creative/survival voxel sandbox**. Its source code and
 textures/shaders are original; it does not include Minecraft assets.
 
 - **W / A / S / D:** move; mouse: look
