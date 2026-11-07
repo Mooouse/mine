@@ -122,3 +122,30 @@
   .world-mode{padding:7px 11px}
   .world-mode small{font-size:9px}
 }
+
+/* Position-based crafting UI (Alpha 0.6) */
+.craft-workbench-ui{
+  margin:2px 0 13px;padding:12px;
+  display:flex;align-items:center;justify-content:center;gap:15px;
+  border:2px solid #a4b5a1;border-bottom-color:#344138;border-right-color:#304136;
+  background:linear-gradient(140deg,#566756,#34453a);
+}
+.craft-section-caption{font-size:10px;font-weight:900;letter-spacing:.1em;color:#eff2d8;margin-bottom:8px}
+.craft-grid{display:grid;grid-template-columns:repeat(3,38px);gap:3px;min-height:123px}
+.craft-grid.portable{grid-template-columns:repeat(2,38px);min-height:79px}
+.craft-grid .inv-slot,.craft-output-column .inv-slot{position:relative;width:38px;height:38px;min-width:38px;padding:1px}
+.craft-grid .inv-slot:not(:disabled):hover{outline:1px solid #e4edca}
+.craft-grid-column{display:flex;flex-direction:column}
+.craft-arrow{font-size:25px;font-weight:900;color:#eddfb1;text-shadow:1px 2px #263527}
+.craft-output-column{display:flex;flex-direction:column;align-items:center}
+.craft-output-column .craft-result{width:52px;height:52px;background:#688063;border-color:#d7e6bc}
+.craft-output-column .craft-result:disabled{opacity:.48;background:#25382f}
+.craft-output-column .craft-result .block-icon{width:38px;height:38px}
+.craft-output-column .craft-result .tool-symbol{font-size:36px}
+.craft-recipe-caption{border-top:1px solid #a0b29673;padding-top:10px}
+@media(max-width:450px){
+  .craft-workbench-ui{padding:8px;gap:9px}
+  .craft-grid{grid-template-columns:repeat(3,34px)}
+  .craft-grid.portable{grid-template-columns:repeat(2,34px)}
+  .craft-grid .inv-slot{width:34px;height:34px;min-width:34px}
+}
