@@ -1,5 +1,7 @@
 //! MINE: an original Rust voxel simulation compiled to WebAssembly.
 mod noise;
+mod survival;
+use survival::{Survival,RECIPES};
 
 use noise::Noise;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -68,6 +70,8 @@ pub struct Game {
     grounded:bool,
     flying:bool,
     time:f32,
+    survival:Option<Survival>,
+    fall_peak:f32,
 }
 
 #[wasm_bindgen]
@@ -83,9 +87,11 @@ impl Game {
             px:8.5, py:34.0, pz:8.5,
             vx:0.0, vy:0.0, vz:0.0,
             grounded:false, flying:false, time:90.0,
+            survival:None,fall_peak:34.0,
         };
         let h = game.height_at(8,8);
         game.py = (h + 8) as f32;
+        game.fall_peak=game.py;
         game
     }
 
@@ -265,7 +271,7 @@ impl Game {
     }
 
     pub fn set_block(&mut self,x:i32,y:i32,z:i32,value:u8) -> bool {
-        if y <= 0 || y >= HEIGHT as i32 || value > 32 { return false; }
+        if y <= 0 || y >= HEIGHT as i32 || value > 33 { return false; }
         let prev = self.block(x,y,z);
         if prev == value { return false; }
         let cx=x.div_euclid(SIDE as i32);
@@ -410,9 +416,18 @@ impl Game {
         if !self.collides(self.px,ny,self.pz) {
             self.py=ny; self.grounded=false;
         } else {
-            if self.vy < 0.0 { self.grounded=true; }
+            if self.vy < 0.0 {
+                self.grounded=true;
+                let distance=(self.fall_peak-self.py).max(0.0);
+                if distance>3.5 {
+                    if let Some(s)=self.survival.as_mut() {
+                        s.damage(((distance-3.0)*1.65).floor() as i32);
+                    }
+                }
+            }
             self.vy=0.0;
         }
+        if self.vy>=0.0 || self.grounded {self.fall_peak=self.py;}
         if self.py < -10.0 { self.py=(self.height_at(self.px as i32,self.pz as i32)+4) as f32; self.vy=0.0; }
     }
 
@@ -423,6 +438,7 @@ impl Game {
     pub fn teleport(&mut self,x:f32,y:f32,z:f32) {
         self.px=x;self.py=y;self.pz=z;
         self.vx=0.0;self.vy=0.0;self.vz=0.0;
+        self.fall_peak=self.py;
     }
 
     pub fn raycast(&mut self,ox:f32,oy:f32,oz:f32,dx:f32,dy:f32,dz:f32,reach:f32) -> Vec<i32> {
@@ -443,6 +459,139 @@ impl Game {
             }
         }
         Vec::new()
+    }
+
+
+    /// Opt-in survival for a separate world namespace; existing creative worlds are unchanged.
+    pub fn enable_survival(&mut self) {
+        if self.survival.is_some() {return;}
+        self.survival=Some(Survival::default());
+        self.flying=false;
+        self.teleport(8.5,(self.height_at(8,8)+2) as f32,8.5);
+    }
+
+    pub fn is_survival(&self)->bool {self.survival.is_some()}
+
+    pub fn survival_status(&self)->Vec<i32> {
+        let Some(s)=self.survival.as_ref()else{return vec![20,20,0];};
+        vec![s.health,s.hunger,if s.dead {1}else{0}]
+    }
+
+    pub fn survival_items(&self)->Vec<i32> {
+        self.survival.as_ref().map(|s|s.packed()).unwrap_or_default()
+    }
+
+    pub fn survival_add_item(&mut self,id:u8,count:u8)->bool {
+        self.survival.as_mut().is_some_and(|s|!s.dead&&s.add(id,count))
+    }
+
+    pub fn survival_transfer(&mut self,from:usize,to:usize,half:bool)->bool {
+        self.survival.as_mut().is_some_and(|s|s.transfer(from,to,half))
+    }
+
+    pub fn survival_close_inventory(&mut self) {
+        let Some(s)=self.survival.as_mut()else{return;};
+        let cursor=s.slot(36);
+        if cursor.id==0{return;}
+        if s.add(cursor.id,cursor.count) {s.slots[36]=survival::Stack::default();}
+    }
+
+    fn near_workbench(&mut self)->bool {
+        let (x,y,z)=(self.px.floor() as i32,self.py.floor() as i32,self.pz.floor() as i32);
+        for dx in -3..=3 {
+            for dy in -2..=2 {
+                for dz in -3..=3 {
+                    if self.block(x+dx,y+dy,z+dz)==survival::WORKBENCH{return true;}
+                }
+            }
+        }
+        false
+    }
+
+    /// Craft recipes are indexed by the static Rust recipe registry, never by JS-provided ingredients.
+    pub fn survival_craft(&mut self,index:usize)->bool {
+        if index>=RECIPES.len(){return false;}
+        let near_bench=if RECIPES[index].workstation {self.near_workbench()}else{false};
+        self.survival.as_mut().is_some_and(|s|!s.dead&&s.craft(index,near_bench))
+    }
+
+    pub fn survival_eat(&mut self,index:usize)->bool {
+        self.survival.as_mut().is_some_and(|s|s.eat(index))
+    }
+
+    pub fn survival_tick(&mut self,dt:f32,moving:bool,sprinting:bool){
+        if let Some(s)=self.survival.as_mut(){s.tick(dt,moving,sprinting);}
+    }
+
+    pub fn survival_damage(&mut self,amount:i32){
+        if let Some(s)=self.survival.as_mut(){s.damage(amount.clamp(0,100));}
+    }
+
+    pub fn survival_respawn(&mut self){
+        if let Some(s)=self.survival.as_mut(){s.respawn();}
+        self.teleport(8.5,(self.height_at(8,8)+2) as f32,8.5);
+    }
+
+    pub fn survival_reset_mining(&mut self){
+        if let Some(s)=self.survival.as_mut(){
+            s.mine_at=None;s.mine_progress=0.0;
+        }
+    }
+
+    /// 0..100: mining progress, 101: mined successfully, negative: blocked/no target.
+    /// Called while the attack button is held; distance and tool rules are enforced in Rust.
+    pub fn survival_mine(&mut self,x:i32,y:i32,z:i32,slot:usize,dt:f32)->i32 {
+        if slot>=9 || y<=0 || y>=HEIGHT as i32 {return -1;}
+        let reach=((self.px-(x as f32+.5)).powi(2)
+            +(self.py+1.25-(y as f32+.5)).powi(2)
+            +(self.pz-(z as f32+.5)).powi(2)).sqrt();
+        if reach>6.6{return -1;}
+        let id=self.block(x,y,z);
+        if id==AIR || id==WATER || (17..=24).contains(&id){return -1;}
+        let Some(s)=self.survival.as_mut()else{return -1;};
+        if s.dead{return -1;}
+        let held=s.slot(slot).id;
+        let seconds=survival::mine_seconds(id,held).max(.05);
+        if s.mine_at!=Some((x,y,z)){
+            s.mine_at=Some((x,y,z));s.mine_progress=0.0;
+        }
+        s.mine_progress+=(dt.clamp(0.0,.10)/seconds);
+        if s.mine_progress<1.0{return (s.mine_progress*100.0).clamp(0.0,99.0) as i32;}
+        let drop=survival::drop_for(id,self.seed,x,y,z,held);
+        if drop!=0 && !s.add(drop,1) {
+            s.mine_progress=.95;
+            return 99; // full inventory: never delete an item silently
+        }
+        s.mine_at=None;s.mine_progress=0.0;
+        s.damage_tool(slot);
+        // set_block is our single source of truth for world edits and fluid updates.
+        if self.set_block(x,y,z,AIR){101}else{-1}
+    }
+
+    pub fn survival_place(&mut self,x:i32,y:i32,z:i32,slot:usize)->bool {
+        if slot>=9||y<=0||y>=HEIGHT as i32{return false;}
+        if ((self.px-(x as f32+.5)).powi(2)
+            +(self.py+1.0-(y as f32+.5)).powi(2)
+            +(self.pz-(z as f32+.5)).powi(2)).sqrt()>6.5{return false;}
+        let Some(s)=self.survival.as_ref()else{return false;};
+        if s.dead{return false;}
+        let item=s.slot(slot).id;
+        if !matches!(item,1..=16|25..=33) || matches!(item,8|14) {return false;}
+        if self.block(x,y,z)!=AIR && self.block(x,y,z)!=FLOWER{return false;}
+        if (self.px-(x as f32+.5)).abs()<.79
+            && (self.pz-(z as f32+.5)).abs()<.79
+            && self.py<y as f32+1.0 && self.py+1.76>y as f32 {return false;}
+        if !self.set_block(x,y,z,item){return false;}
+        self.survival.as_mut().unwrap().use_one(slot);
+        true
+    }
+
+    pub fn export_survival(&self)->String {
+        self.survival.as_ref().map(|s|s.export()).unwrap_or_default()
+    }
+
+    pub fn import_survival(&mut self,txt:&str)->bool {
+        self.survival.as_mut().is_some_and(|s|s.import(txt))
     }
 
     pub fn export_save(&self)->String {
@@ -484,6 +633,24 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn survival_is_isolated_and_crafting_is_authoritative(){
+        let mut g=Game::new(543);
+        g.enable_survival();
+        assert!(g.is_survival());
+        assert!(g.survival_add_item(5,2));
+        assert!(g.survival_craft(0));
+        assert!(g.survival_craft(1));
+        assert!(!g.survival_craft(3)); // tools require a placed bench
+        let stored=g.export_survival();
+        let mut b=Game::new(543); b.enable_survival();
+        assert!(b.import_survival(&stored));
+        assert_eq!(b.survival_items()[1],0); // first slot consumed logs
+        assert!(b.survival_add_item(33,1));
+        assert!(!b.survival_craft(3));
+        let saved_world=g.export_save();
+        assert!(Game::new(543).import_save(&saved_world));
+    }
     #[test]
     fn generated_world_is_deterministic() {
         let mut a=Game::new(123);
