@@ -78,8 +78,88 @@ try{
   }
   await page.locator("#miniClose").evaluate(el=>el.click());
   if(!await page.locator("#menu").isVisible())throw new Error("Main menu did not return after minigames");
+
+  // Switch between modes without changing the original creative world.
+  await page.locator('[data-world-mode="survival"]').click();
+  await page.locator("#playButton").click();
+  await page.locator("#survivalVitals").waitFor({state:"visible",timeout:9000});
+  if(!await page.locator("#mode").textContent().then(t=>t.includes("SURVIVAL")))
+    throw new Error("World mode selector failed to enter Survival");
+  if(await page.locator("#hotbar .slot").count()!==9)throw new Error("Survival hotbar must have 9 slots");
+  await page.keyboard.press("e");
+  await page.locator("#inventory").waitFor({state:"visible"});
+  await page.locator("#survivalCraft").waitFor({state:"visible"});
+  if(await page.locator("#survivalRecipeList .survival-recipe").count()!==9)
+    throw new Error("Expected 9 Rust-backed recipes");
+  if(await page.locator("#inventoryHotbar .inv-slot").count()!==9)
+    throw new Error("Survival inventory missing hotbar");
+  if(await page.locator("#storageSlots .inv-slot").count()!==27)
+    throw new Error("Survival inventory missing backpack");
+  await page.keyboard.press("Escape");
+  await page.locator("#inventory").waitFor({state:"hidden"});
+  await page.locator("#pauseButton").evaluate(el=>el.click());
+  await page.locator("#leaveButton").evaluate(el=>el.click());
+  await page.locator("#menu").waitFor({state:"visible"});
+  const creativeAfter=await page.evaluate(seed=>localStorage.getItem("mine_world_"+seed),currentSeed);
+  if(creativeAfter!==sandboxSave)throw new Error("Survival mode overwrote creative world");
+
+  // Exercise the exported Rust gameplay rules directly, including crafting,
+  // block placement/harvesting, health, persistence and respawn.
+  const rules=await page.evaluate(async()=>{
+    const {Game}=await import("./pkg/mine_web.js");
+    const g=new Game(9941);g.enable_survival();
+    const first=g.survival_status();
+    if(first[0]!==20||first[1]!==20)throw Error("Fresh survival stats wrong");
+    if(!g.survival_add_item(5,3))throw Error("Cannot add testing logs");
+    for(let i=0;i<3;i++)if(!g.survival_craft(0))throw Error("Cannot make planks");
+    if(!g.survival_craft(1))throw Error("Cannot make sticks");
+    if(!g.survival_craft(2))throw Error("Cannot make bench");
+    if(g.survival_craft(3))throw Error("Workbench restriction bypassed");
+    const pos=g.player(),x=Math.floor(pos[0])+2,y=Math.floor(pos[1]),z=Math.floor(pos[2]);
+    g.set_block(x,y,z,0);
+    const items=g.survival_items();
+    const benchIndex=Array.from({length:9},(_,i)=>i).find(i=>items[i*3]===33);
+    if(benchIndex===undefined)throw Error("Workbench not in hotbar");
+    if(!g.survival_place(x,y,z,benchIndex))throw Error("Workbench placement failed");
+    if(g.block(x,y,z)!==33 || !g.survival_has_workbench())
+      throw Error("Placed workbench not registered");
+    if(!g.survival_craft(3))throw Error("Cannot craft wood pick near bench");
+    const updated=g.survival_items();
+    const toolIndex=Array.from({length:9},(_,i)=>i).find(i=>updated[i*3]===41);
+    if(toolIndex===undefined)throw Error("Wooden pick not on hotbar");
+    const rockX=x+1;
+    g.set_block(rockX,y,z,3);
+    let result=-1;
+    for(let k=0;k<240;k++){
+      result=g.survival_mine(rockX,y,z,toolIndex,.05);
+      if(result===101)break;
+    }
+    if(result!==101 || g.block(rockX,y,z)!==0)
+      throw Error("Rust timed block mining did not finish");
+    const before=g.survival_status()[0];
+    g.survival_damage(4);
+    if(g.survival_status()[0]!==before-4)throw Error("Health does not change on damage");
+    const exported=g.export_survival();
+    const copy=new Game(9941);copy.enable_survival();
+    if(!copy.import_survival(exported))throw Error("Survival state import failed");
+    if(copy.survival_status()[0]!==before-4)throw Error("Health not persisted");
+    g.survival_damage(100);
+    if(g.survival_status()[2]!==1)throw Error("Death state not set");
+    g.survival_respawn();
+    if(g.survival_status()[0]!==20||g.survival_status()[2]!==0)throw Error("Respawn failed");
+    copy.free();g.free();
+    return "Rust survival craft, mining, tool, health, save, respawn";
+  });
+  await page.locator('[data-world-mode="creative"]').click();
+  await page.locator("#playButton").click();
+  await page.locator("#survivalVitals").waitFor({state:"hidden"});
+  await page.keyboard.press("e");
+  await page.locator("#creativeBlocks").waitFor({state:"visible"});
+  if(await page.locator("#creativeBlocks .inv-slot").count()!==24)
+    throw new Error("Creative inventory was not restored");
+
   if(errors.length) throw new Error("Browser errors: "+errors.join(" | "));
-  console.log("PASS: WASM + WebGL2, creative inventory, 5 playable minigame arenas, 4 bot rivals per mode, sandbox save isolation");
+  console.log("PASS: WASM + WebGL2, creative + Survival, 9 recipes, resource mining, tools, health, independent saves, 5 arcade arenas and bots; "+rules);
 }finally{
   await browser.close();
 }
