@@ -258,8 +258,9 @@ mod tests{
         assert_eq!(s.count(5),79);
         assert!(s.transfer(0,36,true));
         assert_eq!(s.slot(36).count,32);
+        assert_eq!(s.count(5),47); // items held on cursor are not in the backpack
         assert!(s.transfer(36,2,false));
-        assert_eq!(s.count(5),47);
+        assert_eq!(s.count(5),79); // moving cursor stack back never duplicates or loses items
     }
     #[test] fn recipes_are_atomic_and_require_workbench(){
         let mut s=Survival::default();
