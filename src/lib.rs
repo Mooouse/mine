@@ -1,6 +1,7 @@
 //! MINE: an original Rust voxel simulation compiled to WebAssembly.
 mod noise;
 mod survival;
+mod crafting;
 use survival::{Survival,RECIPES};
 
 use noise::Noise;
@@ -486,7 +487,35 @@ impl Game {
     }
 
     pub fn survival_transfer(&mut self,from:usize,to:usize,half:bool)->bool {
+        if from>=46 || to>=46{return false;}
+        // Portable crafting is 2x2 only; inaccessible grid slots remain
+        // extractable after walking away from a workbench.
+        if to>=37 && ![37,38,40,41].contains(&to) && !self.near_workbench() {
+            return false;
+        }
         self.survival.as_mut().is_some_and(|s|s.transfer(from,to,half))
+    }
+
+    /// id, count, tool wear for the positional 3x3 crafting grid.
+    pub fn survival_grid_items(&self)->Vec<i32>{
+        self.survival.as_ref()
+            .map(|s|s.crafting_grid().iter()
+                .flat_map(|v|[v.id as i32,v.count as i32,v.wear as i32]).collect())
+            .unwrap_or_default()
+    }
+
+    /// [output id, output count, recipe index] or [0,0,-1].
+    pub fn survival_grid_result(&mut self)->Vec<i32>{
+        let near=self.near_workbench();
+        self.survival.as_ref()
+            .and_then(|s|s.grid_result(near))
+            .map(|(index,id,count)|vec![id as i32,count as i32,index as i32])
+            .unwrap_or(vec![0,0,-1])
+    }
+
+    pub fn survival_grid_craft(&mut self)->bool{
+        let near=self.near_workbench();
+        self.survival.as_mut().is_some_and(|s|s.grid_take(near))
     }
 
     pub fn survival_close_inventory(&mut self) {
