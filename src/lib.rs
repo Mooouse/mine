@@ -491,9 +491,16 @@ impl Game {
 
     pub fn survival_close_inventory(&mut self) {
         let Some(s)=self.survival.as_mut()else{return;};
-        let cursor=s.slot(36);
-        if cursor.id==0{return;}
-        if s.add(cursor.id,cursor.count) {s.slots[36]=survival::Stack::default();}
+        if s.slot(36).id==0{return;}
+        // Return the original stack, including tool durability, rather than
+        // creating a new stack with fresh wear.
+        for i in 0..36 {
+            if s.slot(36).id==0 {break;}
+            let destination=s.slot(i);
+            if destination.id==0 || destination.id==s.slot(36).id {
+                s.transfer(36,i,false);
+            }
+        }
     }
 
     fn near_workbench(&mut self)->bool {
