@@ -1,7 +1,7 @@
 //! Original survival systems for MINE. Item counts, crafting and health are authoritative in Rust.
 //! Creative inventory and old M1 world saves are intentionally independent from these rules.
 
-pub const SLOT_COUNT: usize = 37; // 9 hotbar, 27 backpack, one internal cursor slot
+pub const SLOT_COUNT: usize = 46; // 9 hotbar + 27 backpack + cursor + 3x3 crafting grid
 pub const STICK: u8 = 40;
 pub const WOOD_PICK: u8 = 41;
 pub const STONE_PICK: u8 = 42;
@@ -161,6 +161,25 @@ impl Survival{
         if self.slots[from].count==0{self.slots[from]=Stack::default();}
         true
     }
+    pub fn crafting_grid(&self)->[Stack;9] {
+        let mut grid=[Stack::default();9];
+        grid.copy_from_slice(&self.slots[37..46]);
+        grid
+    }
+    pub fn grid_result(&self,near_bench:bool)->Option<(usize,u8,u8)> {
+        crate::crafting::match_grid(&self.crafting_grid(),near_bench)
+    }
+    /// Transactional: output must fit before any ingredient is consumed.
+    pub fn grid_take(&mut self,near_bench:bool)->bool {
+        let Some((_,output,count))=self.grid_result(near_bench)else{return false;};
+        if self.dead||!self.add(output,count){return false;}
+        for slot in &mut self.slots[37..46] {
+            if slot.id==0{continue;}
+            slot.count-=1;
+            if slot.count==0{*slot=Stack::default();}
+        }
+        true
+    }
     pub fn craft(&mut self,recipe_index:usize,near_bench:bool)->bool{
         let Some(recipe)=RECIPES.get(recipe_index)else{return false;};
         if recipe.workstation&&!near_bench{return false;}
@@ -214,7 +233,7 @@ impl Survival{
         self.mine_at=None;self.mine_progress=0.0;
     }
     pub fn export(&self)->String{
-        let mut s=format!("S1|{}|{}|{}|",self.health,self.hunger,self.exhausted);
+        let mut s=format!("S2|{}|{}|{}|",self.health,self.hunger,self.exhausted);
         for (i,slot) in self.slots.iter().enumerate() {
             if i>0{s.push(';');}
             s.push_str(&format!("{},{},{}",slot.id,slot.count,slot.wear));
@@ -224,14 +243,15 @@ impl Survival{
     pub fn import(&mut self,data:&str)->bool{
         if data.len()>5000{return false;}
         let mut p=data.splitn(5,'|');
-        if p.next()!=Some("S1"){return false;}
+        let version=p.next();
+        if version!=Some("S1")&&version!=Some("S2"){return false;}
         let Some(h)=p.next().and_then(|s|s.parse::<i32>().ok())else{return false;};
         let Some(n)=p.next().and_then(|s|s.parse::<i32>().ok())else{return false;};
         let Some(e)=p.next().and_then(|s|s.parse::<f32>().ok())else{return false;};
         if !(0..=20).contains(&h)||!(0..=20).contains(&n)||!e.is_finite()||!(0.0..=1.5).contains(&e){return false;}
         let Some(items)=p.next()else{return false;};
         let rows:Vec<_>=items.split(';').collect();
-        if rows.len()!=SLOT_COUNT{return false;}
+        if rows.len()!=if version==Some("S1"){37}else{SLOT_COUNT}{return false;}
         let mut temp=[Stack::default();SLOT_COUNT];
         for (i,line) in rows.iter().enumerate(){
             let mut parts=line.split(',');
