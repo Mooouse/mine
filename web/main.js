@@ -90,7 +90,7 @@ let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
 let joystick={x:0,y:0,pointer:null};
 let touchLook={pointer:null,x:0,y:0};
-let mouseLastAction=0, leftHeld=false, rightHeld=false, shouldBuildMeshes=true, crouchBlend=0;
+let mouseLastAction=0, creatureLastAttack=0, leftHeld=false, rightHeld=false, shouldBuildMeshes=true, crouchBlend=0;
 const chunkData=new Map(), meshes=new Map(), buildQueue=[];
 const glState={camera:[0,0,0],vp:new Float32Array(16)};
 const MOBILE_ACTIONS = {jump:false,break:false,place:false};
@@ -665,6 +665,78 @@ function drawMiniBots(){
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);
   gl.drawArrays(gl.TRIANGLES,0,vertices.length/8);
 }
+function drawWildlife(vp){
+  if(!isSurvival()||!playing||menuVisible||minigames?.active){
+    $("wildlifeLabels").replaceChildren();return;
+  }
+  const data=game.survival_creatures();
+  const vertices=[],seen=new Set(),labels=$("wildlifeLabels");
+  const width=canvas.clientWidth,height=canvas.clientHeight;
+  for(let i=0;i+7<data.length;i+=8){
+    const [id,kind,x,y,z,heading,step,hp]=data.slice(i,i+8);
+    if(!Number.isFinite(x)||!Number.isFinite(z))continue;
+    const dx=x-player[0],dz=z-player[2];
+    if(dx*dx+dz*dz>(renderDistance*16+10)**2)continue;
+    seen.add(id);
+    const b={x,y,z,heading,step};
+    const sway=Math.sin(step)*0.08;
+    if(kind===1){
+      // Moss grazer: squat four-legged creature, leafy hide, pale horns.
+      botBox(vertices,b,0,.36,0,.85,.67,1.10,6);
+      botBox(vertices,b,0,.44,-.62,.56,.56,.50,1);
+      botBox(vertices,b,-.30,.06,-.36,.21,.43,.27,5);
+      botBox(vertices,b,.30,.06,-.36,.21,.43,.27,5);
+      botBox(vertices,b,-.30,.06+sway,.39,.21,.43,.27,5);
+      botBox(vertices,b,.30,.06-sway,.39,.21,.43,.27,5);
+      botBox(vertices,b,-.22,.87,-.74,.14,.20,.14,7);
+      botBox(vertices,b,.22,.87,-.74,.14,.20,.14,7);
+      botBox(vertices,b,-.17,.63,-.88,.105,.105,.07,12);
+      botBox(vertices,b,.17,.63,-.88,.105,.105,.07,12);
+      botBox(vertices,b,0,.79,.15,.48,.19,.43,27);
+    }else{
+      // Dusk prowler: lean biped, coal-colored torso, luminous amber eyes.
+      botBox(vertices,b,-.21,.05+sway,0,.25,.85,.35,12);
+      botBox(vertices,b,.21,.05-sway,0,.25,.85,.35,12);
+      botBox(vertices,b,0,.86,0,.70,.79,.40,3);
+      botBox(vertices,b,-.48,.84-sway,-.02,.24,.78,.28,12);
+      botBox(vertices,b,.48,.84+sway,-.02,.24,.78,.28,12);
+      botBox(vertices,b,0,1.67,-.06,.62,.61,.55,15);
+      botBox(vertices,b,-.19,1.91,-.37,.12,.13,.08,13);
+      botBox(vertices,b,.19,1.91,-.37,.12,.13,.08,13);
+      botBox(vertices,b,0,1.42,-.35,.25,.12,.12,29);
+    }
+    const ly=y+(kind===1?1.55:2.45);
+    const pz=vp[3]*x+vp[7]*ly+vp[11]*z+vp[15];
+    const px=vp[0]*x+vp[4]*ly+vp[8]*z+vp[12];
+    const py=vp[1]*x+vp[5]*ly+vp[9]*z+vp[13];
+    const key="wild-"+id;
+    let el=document.getElementById(key);
+    if(!el){
+      el=document.createElement("span");el.id=key;
+      el.className="wildlife-name";
+      labels.appendChild(el);
+    }
+    if(pz<=.05||Math.abs(px/pz)>1.2||Math.abs(py/pz)>1.25){
+      el.classList.add("hidden");continue;
+    }
+    el.classList.remove("hidden");
+    el.innerHTML='<strong>'+(kind===1?"MOSS GRAZER":"DUSK PROWLER")+
+      '</strong><span class="wild-hp"><i style="width:'+
+      Math.min(100,Math.max(0,hp/(kind===1?5:8)*100))+'%"></i></span>';
+    el.style.left=(px/pz*.5+.5)*width+"px";
+    el.style.top=(.5-py/pz*.5)*height+"px";
+  }
+  for(const el of labels.children){
+    const id=Number(el.id.slice(5));
+    if(!seen.has(id))el.remove();
+  }
+  if(vertices.length){
+    gl.bindVertexArray(botVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER,botVbo);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);
+    gl.drawArrays(gl.TRIANGLES,0,vertices.length/8);
+  }
+}
 function drawSelection(vp,coord){
   if(!coord || coord.length!==7)return;
   const [x,y,z]=coord,eps=.003;
@@ -726,7 +798,7 @@ function render(time){
   if(minigames?.active){
     drawMiniBots();
     minigames.updateTags(vp,canvas.clientWidth,canvas.clientHeight);
-  }
+  }else drawWildlife(vp);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);
@@ -1347,7 +1419,20 @@ function simulation(dt,time){
     survivalUI.refreshHUD();
     if(paused)return;
     if(leftHeld||MOBILE_ACTIONS.break){
-      survivalUI.mine(target,dt);
+      let hit=false;
+      if(time-creatureLastAttack>490){
+        const look=getLook();
+        const result=game.survival_attack_creature(...look,selected);
+        if(result){
+          creatureLastAttack=time;
+          hit=true;
+          survivalUI.cancelMining();
+          soundEffect(false);
+          if(result===2){toast("CREATURE DEFEATED · RESOURCES COLLECTED");}
+          survivalUI.renderHotbar();
+        }
+      }
+      if(!hit)survivalUI.mine(target,dt);
     }else{
       survivalUI.cancelMining();
     }
