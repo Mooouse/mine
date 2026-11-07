@@ -70,6 +70,14 @@ let survivalUI=null,worldMode="creative",requestedMode="creative",survivalDead=f
 const isSurvival=()=>worldMode==="survival"&&!arenaWorldActive;
 const saveKey=(id,mode=worldMode)=>mode==="survival"?"mine_survival_world_"+id:"mine_world_"+id;
 const survivalKey=id=>"mine_survival_state_"+id;
+function updateControlsHint(){
+  const node=$("controlsHint");
+  if(!node)return;
+  if(!node.dataset.creativeMarkup)node.dataset.creativeMarkup=node.innerHTML;
+  if(isSurvival()){
+    node.textContent="WASD MOVE · SPACE JUMP · CTRL SPRINT · HOLD LEFT TO MINE · RIGHT PLACE/EAT · E CRAFT · R EAT";
+  }else node.innerHTML=node.dataset.creativeMarkup;
+}
 function updateModePicker(){
   for(const btn of document.querySelectorAll("[data-world-mode]")){
     const active=btn.dataset.worldMode===requestedMode;
@@ -1064,7 +1072,7 @@ function switchWorld(newSeed,loadSaved,skipOldSave=false,nextMode=worldMode){
   player=game.player();
   localStorage.setItem("mine_last_seed",String(seed));
   localStorage.setItem("mine_last_mode",worldMode);
-  renderHotbar();renderHUD();
+  renderHotbar();updateControlsHint();renderHUD();
 }
 function start(){
   playing=true;paused=false;menuVisible=false;
@@ -1074,6 +1082,7 @@ function start(){
   if(isMobile)$("mobile-controls").classList.remove("hidden");
   else canvas.requestPointerLock?.().catch(()=>{});
   if(!minigames?.active){
+    updateControlsHint();
     if(isSurvival())survivalUI?.enterSurvival();
     else survivalUI?.leaveSurvival();
     showHelp();showSelectedName();
@@ -1368,6 +1377,11 @@ function frameLoop(time){
   }
   requestAnimationFrame(frameLoop);
 }
+// Page reload and app switching must not lose the last few seconds of survival edits.
+addEventListener("pagehide",()=>{if(playing&&!arenaWorldActive)save();});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"&&playing&&!arenaWorldActive)save();
+});
 async function main(){
   try{
     $("loading-progress").style.width="23%";
@@ -1432,6 +1446,7 @@ async function main(){
       }
     });
     connectControls();
+    updateControlsHint();
     renderDistance=Number(localStorage.getItem("mine_distance"))||3;
     renderDistance=clamp(renderDistance,2,5);
     sensitivity=Number(localStorage.getItem("mine_sensitivity"))||1;
