@@ -472,11 +472,31 @@ function facesMesh(cx,cz){
   const solid=[],trans=[];
   const x0=cx*CHUNK,z0=cz*CHUNK;
   const chunk=rawChunk(cx,cz);
+  const opaque=id=>id>0 && !isWater(id) && id!==10 && id!==14 && id!==6;
+  // Vertex ambient occlusion: corners next to 2 or 3 opaque blocks are
+  // darker, making joins, overhangs, tunnels and caves read as true volumes.
+  // Cache the four corner samples per face instead of querying per triangle.
+  const cornerShade=(x,y,z,face,corner)=>{
+    const n=face.d;
+    const axes=n[0]!==0?[1,2]:n[1]!==0?[0,2]:[0,1];
+    const a=axes[0],b=axes[1],va=corner[a]===0?-1:1,vb=corner[b]===0?-1:1;
+    const base=[x+n[0],y+n[1],z+n[2]];
+    const sample=(oa,ob)=>{
+      const c=base.slice();
+      c[a]+=oa;c[b]+=ob;
+      return opaque(blockAt(c[0],c[1],c[2]))?1:0;
+    };
+    const side1=sample(va,0),side2=sample(0,vb);
+    const diagonal=sample(va,vb);
+    return side1&&side2?.50:1-.17*(side1+side2+diagonal);
+  };
   const addFace=(buffer,x,y,z,id,face,height=1)=>{
-    const corners=face.c;
+    const corners=face.c,shades=(isWater(id)||id===10)?
+      [1,1,1,1]:corners.map(c=>cornerShade(x,y,z,face,c));
     for(let k=0;k<6;k++){
-      const c=corners[TRI[k]];
-      buffer.push(x+c[0],y+(c[1]?height:0),z+c[2],face.n[0],face.n[1],face.n[2],isWater(id)?8:id,face.light);
+      const j=TRI[k],c=corners[j];
+      buffer.push(x+c[0],y+(c[1]?height:0),z+c[2],
+        face.n[0],face.n[1],face.n[2],isWater(id)?8:id,face.light*shades[j]);
     }
   };
   for(let y=0;y<WORLD_HEIGHT;y++){
