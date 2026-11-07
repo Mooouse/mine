@@ -508,6 +508,12 @@ impl Game {
         false
     }
 
+    /// Whether the player is close to a placed workbench (crafting is still validated here).
+    pub fn survival_has_workbench(&mut self)->bool {
+        if self.survival.is_none(){return false;}
+        self.near_workbench()
+    }
+
     /// Craft recipes are indexed by the static Rust recipe registry, never by JS-provided ingredients.
     pub fn survival_craft(&mut self,index:usize)->bool {
         if index>=RECIPES.len(){return false;}
@@ -557,7 +563,7 @@ impl Game {
             s.mine_at=Some((x,y,z));s.mine_progress=0.0;
         }
         s.mine_progress+=(dt.clamp(0.0,0.10)/seconds);
-        if s.mine_progress<1.0{return (s.mine_progress*10.0).clamp(0.0,99.0) as i32;}
+        if s.mine_progress<1.0{return (s.mine_progress*100.0).clamp(0.0,99.0) as i32;}
         let drop=survival::drop_for(id,self.seed,x,y,z,held);
         if drop!=0 && !s.add(drop,1) {
             s.mine_progress=0.95;
