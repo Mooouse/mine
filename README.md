@@ -1,6 +1,6 @@
 # MINE
 
-**Play the current MINE Alpha 0.5:** [Open the latest compiled Rust/WebAssembly build](https://raw.githack.com/Mooouse/mine/site/index.html)
+**Play the current MINE Alpha 0.6:** [Open the latest compiled Rust/WebAssembly build](https://raw.githack.com/Mooouse/mine/site/index.html)
 
 **GitHub Pages notice:** `https://mooouse.github.io/mine/` currently serves **Alpha 0.2**, because GitHub Pages deployment is stuck on `updating_pages`. The latest compiled game is pushed to the `site` branch and verified in headless Chrome using its live mirror link.
 
@@ -8,9 +8,38 @@ To restore the original GitHub Pages address, repository administrator:
 1. Open **Settings → Pages → Build and deployment**.
 2. Change **Source** to **Deploy from a branch**.
 3. Choose branch **site** and folder **/(root)**; click **Save**.
-4. After the site is published, verify `ALPHA 0.5` in the menu. A force reload (Ctrl+F5) can clear the previous asset cache.
+4. After the site is published, verify `ALPHA 0.6` in the menu. A force reload (Ctrl+F5) can clear the previous asset cache.
 
 An original, independent voxel sandbox built with **Rust + WebAssembly**, with a lightweight WebGL2 front end. Inspired by Horizon's Rust approach, but **not** a redistribution of Minecraft or its game assets.
+
+## Alpha 0.6 — Living World + Positional Crafting
+
+MINE now includes additional features built as original Rust/WebAssembly game
+logic rather than JavaScript-only mockups:
+
+- **Real crafting grid:** a 2×2 grid in portable survival inventory and 3×3
+  while standing near a placed workbench. Pick ingredients from the backpack
+  and put them into each grid cell, then click the output. Shapes, occupied
+  squares, ingredient consumption and output space are checked in Rust.
+- **Recipe book** remains available for convenient quick-crafting of the nine
+  initial recipes. Both methods use the same inventory economy.
+- **Living wildlife:** friendly **Moss Grazers** roam outdoors and can provide
+  berries; **Dusk Prowlers** appear after nightfall and attack nearby players.
+  They are original voxel models with world-space name/health markers.
+- **Melee combat:** attack creatures with left-click / the mobile attack
+  control. Reach, camera aim, line-of-sight, damage, attack cooldown and loot
+  are validated in Rust; tools wear down.
+- **Richer lighting:** per-corner voxel ambient occlusion adds shadowing
+  around block edges, overhangs and caves.
+- **New terrain landmarks:** deterministic mossy boulders, rare crumbling
+  stone lookouts and glowing cave formations.
+- **Safe save migration:** new worlds serialize as M2 and survival inventories
+  as S2. The original M1 worlds keep their old generation; S1 inventories
+  migrate without erasing items or crafted tools. The five arcade modes and
+  creative building remain available.
+
+This is not an entire Minecraft remake. No online multiplayer, farming,
+advanced electrical networks or mob breeding is claimed here.
 
 ## SURVIVAL — playable milestone (Alpha 0.5)
 
@@ -35,8 +64,8 @@ Survival rules are authoritative in **Rust/WebAssembly**:
   All five offline minigames remain available without affecting either.
 
 This is an incremental survival implementation, not complete Minecraft
-feature parity. Mobs, farming, combat, advanced lighting and multiplayer
-remain milestones described in
+feature parity. Farming, advanced combat, multiplayer and detailed light
+propagation remain milestones described in
 [docs/clean-room-voxel-roadmap.md](docs/clean-room-voxel-roadmap.md).
 
 ## MINE ARCADE — five mini-games (Alpha 0.5)
