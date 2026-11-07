@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="ui-v2.css" />
   <link rel="stylesheet" href="minigames.css" />
+  <link rel="stylesheet" href="survival.css" />
   <title>MINE — Build your own world</title>
 </head>
 <body>
@@ -25,6 +26,8 @@
       <button id="inventoryButton" class="icon-button" title="Inventory (E)" aria-label="Inventory"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
       <button id="pauseButton" class="icon-button" title="Pause (Esc)" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
     </header>
+    <div id="survivalVitals" class="survival-vitals hidden" aria-live="off"><div id="survivalHearts" class="vital-hearts">♥♥♥♥♥♥♥♥♥♥</div><div id="survivalHunger" class="vital-hunger">◆◆◆◆◆◆◆◆◆◆</div></div>
+    <div id="miningProgress" class="mining-progress hidden"><div id="miningProgressBar"></div></div>
     <div id="debugOverlay" class="debug-overlay hidden" aria-live="off"></div>
     <div id="itemToast" class="item-toast hidden"></div>
     <div id="miniHud" class="mini-hud hidden" aria-live="polite">
@@ -59,7 +62,7 @@
   <div id="inventory" class="inventory-overlay hidden" role="dialog" aria-modal="true" aria-label="Creative inventory">
     <div class="inv-window">
       <div class="inv-header">
-        <div><div class="inv-kicker">CREATIVE WORLD</div><h2>Inventory</h2></div>
+        <div><div class="inv-kicker" id="inventoryKicker">CREATIVE WORLD</div><h2 id="inventoryTitle">Inventory</h2></div>
         <button id="closeInventory" class="inv-close" aria-label="Close inventory" title="Close (E or Esc)">×</button>
       </div>
       <div class="inv-columns">
@@ -73,6 +76,11 @@
           </div>
           <input type="search" id="inventorySearch" placeholder="Search blocks..." aria-label="Search blocks" autocomplete="off"/>
           <div id="creativeBlocks" class="inv-catalog-grid"></div>
+          <div id="survivalCraft" class="survival-craft hidden">
+            <p>Gather resources and craft useful items. Tools require a nearby placed workbench.</p>
+            <div id="survivalRecipeList" class="survival-recipe-list"></div>
+            <div class="survival-craft-hint" id="survivalBenchHint">PORTABLE CRAFTING • PLACE A WORKBENCH FOR TOOLS</div>
+          </div>
           <div class="inv-hint">CLICK to pick up • RIGHT CLICK to add • SHIFT+CLICK to quick move</div>
         </section>
         <section class="inv-storage">
@@ -106,13 +114,17 @@
         <div><strong>24</strong><span>BLOCK MATERIALS</span></div>
         <div><strong>3D</strong><span>SANDBOX</span></div>
       </div>
+      <div class="world-mode-picker" id="worldModePicker" role="group" aria-label="World game mode">
+        <button type="button" class="world-mode selected" data-world-mode="creative" aria-pressed="true"><span>✦ CREATIVE</span><small>Unlimited building</small></button>
+        <button type="button" class="world-mode" data-world-mode="survival" aria-pressed="false"><span>♥ SURVIVAL</span><small>Craft · gather · survive</small></button>
+      </div>
       <div class="menu-actions">
         <button id="playButton" class="primary-button"><span>ENTER THE WORLD</span><span class="arrow">↗</span></button>
         <button id="miniGamesButton" class="mini-menu-button"><span>✦ &nbsp; MINIGAMES</span><span>5 ARENAS &nbsp; ↗</span></button>
         <button id="newButton" class="secondary-button">CREATE NEW WORLD <span>＋</span></button>
       </div>
       <div class="seed-row"><label for="seedInput">WORLD SEED</label><input id="seedInput" type="text" inputmode="numeric" value="42042" maxlength="10"/><button id="randomSeed" title="Randomize seed" aria-label="Randomize seed">↻</button></div>
-      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.4</span></div>
+      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.5 · SURVIVAL</span></div>
     </div>
     <div class="menu-scenery-caption">EXPLORE <span>•</span> CREATE <span>•</span> DISCOVER</div>
   </div>
@@ -128,6 +140,16 @@
       <div class="mini-lobby-foot"><span>NO REAL PLAYERS · 4 COMPUTER BOTS PER MATCH</span><span>WASD · SPACE · MOUSE</span></div>
     </section>
   </div>
+  <div id="survivalDeath" class="mini-overlay survival-death-overlay hidden" role="dialog" aria-modal="true" aria-label="Survival game over">
+    <section class="survival-death-panel">
+      <div class="mini-eyebrow">MINE · SURVIVAL</div>
+      <h2>YOU DIED</h2>
+      <p>Respawn and continue exploring. Your backpack stays with you.</p>
+      <button id="survivalRespawn" class="primary-button">RESPAWN <span>↗</span></button>
+      <button id="survivalDeathMenu" class="secondary-button">SAVE &amp; RETURN TO MENU <span>←</span></button>
+    </section>
+  </div>
+
   <div id="miniResult" class="mini-overlay mini-result-overlay hidden" role="dialog" aria-modal="true" aria-label="Minigame results">
     <section class="mini-result-card">
       <div class="mini-eyebrow">MATCH FINISHED · <span id="miniResultMode">SPLEEF</span></div>
