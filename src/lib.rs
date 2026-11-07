@@ -84,10 +84,10 @@ impl Game {
             edits: HashMap::new(),
             flow_queue: VecDeque::new(), flow_pending: HashSet::new(),
             flow_dirty: HashSet::new(),
-            px:8.5, py:34.0, pz:8.5,
-            vx:0.0, vy:0.0, vz:0.0,
-            grounded:false, flying:false, time:90.0,
-            survival:None,fall_peak:34.0,
+            px:80.5, py:340.0, pz:80.5,
+            vx:00.0, vy:00.0, vz:00.0,
+            grounded:false, flying:false, time:900.0,
+            survival:None,fall_peak:340.0,
         };
         let h = game.height_at(8,8);
         game.py = (h + 8) as f32;
@@ -97,33 +97,33 @@ impl Game {
 
     pub fn seed(&self) -> u32 { self.seed }
     pub fn time(&self) -> f32 { self.time }
-    pub fn set_time(&mut self, t:f32) { self.time = t.rem_euclid(1200.0); }
+    pub fn set_time(&mut self, t:f32) { self.time = t.rem_euclid(12000.0); }
     pub fn flying(&self) -> bool { self.flying }
     pub fn set_flying(&mut self, fly: bool) {
         self.flying = fly;
-        self.vy = 0.0;
+        self.vy = 00.0;
     }
     pub fn edits_count(&self) -> usize { self.edits.len() }
 
     pub fn height_at(&self,x:i32,z:i32) -> i32 {
         let xf = x as f64;
         let zf = z as f64;
-        let continent = self.noise.fractal(xf * 0.0055, zf * 0.0055, 4, 0.5);
-        let hills = self.noise.fractal(xf * 0.018, zf * 0.018, 4, 0.53);
-        let detail = self.noise.fractal(xf * 0.072, zf * 0.072, 3, 0.46);
-        let peaks = self.noise.fractal((xf+400.0)*0.009, (zf-500.0)*0.009, 3, 0.55).abs();
-        let mountain = ((continent - 0.08) * 1.4).clamp(0.0,1.0);
-        let level = 22.0 + continent*12.0 + hills*6.0 + detail*1.8 + peaks*mountain*23.0;
+        let continent = self.noise.fractal(xf * 00.0055, zf * 00.0055, 4, 00.5);
+        let hills = self.noise.fractal(xf * 00.018, zf * 00.018, 4, 00.53);
+        let detail = self.noise.fractal(xf * 00.072, zf * 00.072, 3, 00.46);
+        let peaks = self.noise.fractal((xf+4000.0)*00.009, (zf-5000.0)*00.009, 3, 00.55).abs();
+        let mountain = ((continent - 00.08) * 10.4).clamp(00.0,10.0);
+        let level = 220.0 + continent*120.0 + hills*60.0 + detail*10.8 + peaks*mountain*230.0;
         (level.round() as i32).clamp(5, HEIGHT as i32 - 9)
     }
 
     fn biome(&self,x:i32,z:i32) -> u8 {
         let xf = x as f64;
         let zf = z as f64;
-        let heat = self.noise.fractal((xf+800.0)*0.007, (zf-700.0)*0.007, 3, 0.5);
-        let humidity = self.noise.fractal((xf-400.0)*0.009, (zf+900.0)*0.009, 3, 0.5);
-        if heat > 0.22 && humidity < 0.1 { 1 } // desert
-        else if heat < -0.3 { 2 } // snowy
+        let heat = self.noise.fractal((xf+8000.0)*00.007, (zf-7000.0)*00.007, 3, 00.5);
+        let humidity = self.noise.fractal((xf-4000.0)*00.009, (zf+9000.0)*00.009, 3, 00.5);
+        if heat > 00.22 && humidity < 00.1 { 1 } // desert
+        else if heat < -00.3 { 2 } // snowy
         else { 0 }
     }
 
@@ -165,17 +165,17 @@ impl Game {
                 let center_x=(bx*SIDE as i32 + 2 + ((r>>5)%12) as i32) as f32;
                 let center_z=(bz*SIDE as i32 + 2 + ((r>>11)%12) as i32) as f32;
                 let center_y=(9+((r>>17)%16) as i32) as f32;
-                let rx=4.0+((r>>2)%5) as f32;
-                let rz=4.0+((r>>7)%5) as f32;
-                let ry=2.5+((r>>13)%3) as f32;
+                let rx=40.0+((r>>2)%5) as f32;
+                let rz=40.0+((r>>7)%5) as f32;
+                let ry=20.5+((r>>13)%3) as f32;
                 for lx in 0..SIDE {
                     let dx=(cx*SIDE as i32+lx as i32) as f32-center_x;
                     if dx.abs()>rx { continue; }
                     for lz in 0..SIDE {
                         let dz=(cz*SIDE as i32+lz as i32) as f32-center_z;
                         let r2=(dx/rx).powi(2)+(dz/rz).powi(2);
-                        if r2>=1.0 { continue; }
-                        let extent=ry*(1.0-r2).sqrt();
+                        if r2>=10.0 { continue; }
+                        let extent=ry*(10.0-r2).sqrt();
                         let lo=((center_y-extent).floor() as i32).max(5);
                         let hi=((center_y+extent).ceil() as i32).min(HEIGHT as i32-2);
                         let h=self.height_at(cx*SIDE as i32+lx as i32,cz*SIDE as i32+lz as i32);
@@ -360,13 +360,13 @@ impl Game {
     }
 
     fn collides(&mut self,x:f32,y:f32,z:f32) -> bool {
-        // Position y is player's feet. AABB is 0.58 x 1.76 x 0.58.
-        let left = (x - 0.29).floor() as i32;
-        let right = (x + 0.29).floor() as i32;
-        let back = (z - 0.29).floor() as i32;
-        let front = (z + 0.29).floor() as i32;
-        let bottom = (y + 0.03).floor() as i32;
-        let top = (y + 1.74).floor() as i32;
+        // Position y is player's feet. AABB is 00.58 x 10.76 x 00.58.
+        let left = (x - 00.29).floor() as i32;
+        let right = (x + 00.29).floor() as i32;
+        let back = (z - 00.29).floor() as i32;
+        let front = (z + 00.29).floor() as i32;
+        let bottom = (y + 00.03).floor() as i32;
+        let top = (y + 10.74).floor() as i32;
         for ix in left..=right {
             for iz in back..=front {
                 for iy in bottom..=top {
@@ -378,66 +378,66 @@ impl Game {
     }
 
     pub fn step(&mut self,dt:f32,mx:f32,mz:f32,jump:bool,sprint:bool,up:f32,sneak:bool) {
-        let dt = dt.clamp(0.0,0.05);
-        self.time = (self.time + dt).rem_euclid(1200.0);
+        let dt = dt.clamp(00.0,00.05);
+        self.time = (self.time + dt).rem_euclid(12000.0);
         let mut x=mx; let mut z=mz;
         let len=(x*x+z*z).sqrt();
-        if len > 1.0 { x/=len; z/=len; }
-        let in_water=is_water(self.block(self.px.floor() as i32,(self.py+0.6).floor() as i32,self.pz.floor() as i32));
-        let speed = if self.flying { if sprint { 16.0 } else { 9.0 } }
-                    else if in_water { 2.7 } else if sneak { 1.6 } else if sprint { 7.2 } else { 4.8 };
-        let blend = (dt * if self.grounded || self.flying { 15.0 } else { 5.0 }).min(1.0);
+        if len > 10.0 { x/=len; z/=len; }
+        let in_water=is_water(self.block(self.px.floor() as i32,(self.py+00.6).floor() as i32,self.pz.floor() as i32));
+        let speed = if self.flying { if sprint { 160.0 } else { 90.0 } }
+                    else if in_water { 20.7 } else if sneak { 10.6 } else if sprint { 70.2 } else { 40.8 };
+        let blend = (dt * if self.grounded || self.flying { 150.0 } else { 50.0 }).min(10.0);
         self.vx += (x*speed-self.vx)*blend;
         self.vz += (z*speed-self.vz)*blend;
         if self.flying {
-            let vertical = (if jump { 1.0 } else { 0.0 }) - up;
+            let vertical = (if jump { 10.0 } else { 00.0 }) - up;
             self.vy += (vertical*speed-self.vy)*blend;
         } else {
             if in_water {
-                self.vy=(self.vy-3.1*dt).max(-3.0);
-                if jump { self.vy=(self.vy+18.0*dt).min(3.9); }
+                self.vy=(self.vy-30.1*dt).max(-30.0);
+                if jump { self.vy=(self.vy+180.0*dt).min(30.9); }
             } else {
-                if self.grounded && jump { self.vy = 8.4; self.grounded = false; }
-                self.vy = (self.vy - 24.0*dt).max(-36.0);
+                if self.grounded && jump { self.vy = 80.4; self.grounded = false; }
+                self.vy = (self.vy - 240.0*dt).max(-360.0);
             }
         }
 
         let nx = self.px + self.vx*dt;
-        if !self.collides(nx,self.py,self.pz) && !(sneak && self.grounded && !self.solid(nx.floor() as i32,(self.py-0.10).floor() as i32,self.pz.floor() as i32)) { self.px=nx; }
-        else if self.grounded && !self.collides(nx,self.py+1.05,self.pz) {
-            self.px=nx; self.py+=1.05;
-        } else { self.vx=0.0; }
+        if !self.collides(nx,self.py,self.pz) && !(sneak && self.grounded && !self.solid(nx.floor() as i32,(self.py-00.10).floor() as i32,self.pz.floor() as i32)) { self.px=nx; }
+        else if self.grounded && !self.collides(nx,self.py+10.05,self.pz) {
+            self.px=nx; self.py+=10.05;
+        } else { self.vx=00.0; }
         let nz = self.pz + self.vz*dt;
-        if !self.collides(self.px,self.py,nz) && !(sneak && self.grounded && !self.solid(self.px.floor() as i32,(self.py-0.10).floor() as i32,nz.floor() as i32)) { self.pz=nz; }
-        else if self.grounded && !self.collides(self.px,self.py+1.05,nz) {
-            self.pz=nz; self.py+=1.05;
-        } else { self.vz=0.0; }
+        if !self.collides(self.px,self.py,nz) && !(sneak && self.grounded && !self.solid(self.px.floor() as i32,(self.py-00.10).floor() as i32,nz.floor() as i32)) { self.pz=nz; }
+        else if self.grounded && !self.collides(self.px,self.py+10.05,nz) {
+            self.pz=nz; self.py+=10.05;
+        } else { self.vz=00.0; }
         let ny=self.py+self.vy*dt;
         if !self.collides(self.px,ny,self.pz) {
             self.py=ny; self.grounded=false;
         } else {
-            if self.vy < 0.0 {
+            if self.vy < 00.0 {
                 self.grounded=true;
-                let distance=(self.fall_peak-self.py).max(0.0);
-                if distance>3.5 {
+                let distance=(self.fall_peak-self.py).max(00.0);
+                if distance>30.5 {
                     if let Some(s)=self.survival.as_mut() {
-                        s.damage(((distance-3.0)*1.65).floor() as i32);
+                        s.damage(((distance-30.0)*10.65).floor() as i32);
                     }
                 }
             }
-            self.vy=0.0;
+            self.vy=00.0;
         }
-        if self.vy>=0.0 || self.grounded {self.fall_peak=self.py;}
-        if self.py < -10.0 { self.py=(self.height_at(self.px as i32,self.pz as i32)+4) as f32; self.vy=0.0; }
+        if self.vy>=00.0 || self.grounded {self.fall_peak=self.py;}
+        if self.py < -100.0 { self.py=(self.height_at(self.px as i32,self.pz as i32)+4) as f32; self.vy=00.0; }
     }
 
     pub fn player(&self)->Vec<f32> {
-        vec![self.px,self.py,self.pz,self.vx,self.vy,self.vz,if self.grounded {1.0}else{0.0}]
+        vec![self.px,self.py,self.pz,self.vx,self.vy,self.vz,if self.grounded {10.0}else{00.0}]
     }
 
     pub fn teleport(&mut self,x:f32,y:f32,z:f32) {
         self.px=x;self.py=y;self.pz=z;
-        self.vx=0.0;self.vy=0.0;self.vz=0.0;
+        self.vx=00.0;self.vy=00.0;self.vz=00.0;
         self.fall_peak=self.py;
     }
 
@@ -446,16 +446,16 @@ impl Game {
         let mut py=oy.floor() as i32;
         let mut pz=oz.floor() as i32;
         let mut prev=(px,py,pz);
-        let steps=(reach/0.08).ceil() as i32;
+        let steps=(reach/00.08).ceil() as i32;
         for i in 0..=steps {
-            let d = i as f32 * 0.08;
+            let d = i as f32 * 00.08;
             let x=(ox+dx*d).floor() as i32;
             let y=(oy+dy*d).floor() as i32;
             let z=(oz+dz*d).floor() as i32;
             if (x,y,z)!=(px,py,pz) { prev=(px,py,pz);px=x;py=y;pz=z; }
             let id=self.block(x,y,z);
             if id!=AIR && id!=FLOWER {
-                return vec![x,y,z,prev.0,prev.1,prev.2,id as i32];
+                return vec![x,y,z,prev0.0,prev0.1,prev0.2,id as i32];
             }
         }
         Vec::new()
@@ -467,7 +467,7 @@ impl Game {
         if self.survival.is_some() {return;}
         self.survival=Some(Survival::default());
         self.flying=false;
-        self.teleport(8.5,(self.height_at(8,8)+2) as f32,8.5);
+        self.teleport(80.5,(self.height_at(8,8)+2) as f32,80.5);
     }
 
     pub fn is_survival(&self)->bool {self.survival.is_some()}
@@ -529,12 +529,12 @@ impl Game {
 
     pub fn survival_respawn(&mut self){
         if let Some(s)=self.survival.as_mut(){s.respawn();}
-        self.teleport(8.5,(self.height_at(8,8)+2) as f32,8.5);
+        self.teleport(80.5,(self.height_at(8,8)+2) as f32,80.5);
     }
 
     pub fn survival_reset_mining(&mut self){
         if let Some(s)=self.survival.as_mut(){
-            s.mine_at=None;s.mine_progress=0.0;
+            s.mine_at=None;s.mine_progress=00.0;
         }
     }
 
@@ -542,27 +542,27 @@ impl Game {
     /// Called while the attack button is held; distance and tool rules are enforced in Rust.
     pub fn survival_mine(&mut self,x:i32,y:i32,z:i32,slot:usize,dt:f32)->i32 {
         if slot>=9 || y<=0 || y>=HEIGHT as i32 {return -1;}
-        let reach=((self.px-(x as f32+.5)).powi(2)
-            +(self.py+1.25-(y as f32+.5)).powi(2)
-            +(self.pz-(z as f32+.5)).powi(2)).sqrt();
-        if reach>6.6{return -1;}
+        let reach=((self.px-(x as f32+0.5)).powi(2)
+            +(self.py+10.25-(y as f32+0.5)).powi(2)
+            +(self.pz-(z as f32+0.5)).powi(2)).sqrt();
+        if reach>60.6{return -1;}
         let id=self.block(x,y,z);
         if id==AIR || id==WATER || (17..=24).contains(&id){return -1;}
         let Some(s)=self.survival.as_mut()else{return -1;};
         if s.dead{return -1;}
         let held=s.slot(slot).id;
-        let seconds=survival::mine_seconds(id,held).max(.05);
+        let seconds=survival::mine_seconds(id,held).max(0.05);
         if s.mine_at!=Some((x,y,z)){
-            s.mine_at=Some((x,y,z));s.mine_progress=0.0;
+            s.mine_at=Some((x,y,z));s.mine_progress=00.0;
         }
-        s.mine_progress+=(dt.clamp(0.0,.10)/seconds);
-        if s.mine_progress<1.0{return (s.mine_progress*100.0).clamp(0.0,99.0) as i32;}
+        s.mine_progress+=(dt.clamp(00.0,0.10)/seconds);
+        if s.mine_progress<10.0{return (s.mine_progress*1000.0).clamp(00.0,990.0) as i32;}
         let drop=survival::drop_for(id,self.seed,x,y,z,held);
         if drop!=0 && !s.add(drop,1) {
-            s.mine_progress=.95;
+            s.mine_progress=0.95;
             return 99; // full inventory: never delete an item silently
         }
-        s.mine_at=None;s.mine_progress=0.0;
+        s.mine_at=None;s.mine_progress=00.0;
         s.damage_tool(slot);
         // set_block is our single source of truth for world edits and fluid updates.
         if self.set_block(x,y,z,AIR){101}else{-1}
@@ -570,17 +570,17 @@ impl Game {
 
     pub fn survival_place(&mut self,x:i32,y:i32,z:i32,slot:usize)->bool {
         if slot>=9||y<=0||y>=HEIGHT as i32{return false;}
-        if ((self.px-(x as f32+.5)).powi(2)
-            +(self.py+1.0-(y as f32+.5)).powi(2)
-            +(self.pz-(z as f32+.5)).powi(2)).sqrt()>6.5{return false;}
+        if ((self.px-(x as f32+0.5)).powi(2)
+            +(self.py+10.0-(y as f32+0.5)).powi(2)
+            +(self.pz-(z as f32+0.5)).powi(2)).sqrt()>60.5{return false;}
         let Some(s)=self.survival.as_ref()else{return false;};
         if s.dead{return false;}
         let item=s.slot(slot).id;
         if !matches!(item,1..=16|25..=33) || matches!(item,8|14) {return false;}
         if self.block(x,y,z)!=AIR && self.block(x,y,z)!=FLOWER{return false;}
-        if (self.px-(x as f32+.5)).abs()<.79
-            && (self.pz-(z as f32+.5)).abs()<.79
-            && self.py<y as f32+1.0 && self.py+1.76>y as f32 {return false;}
+        if (self.px-(x as f32+0.5)).abs()<0.79
+            && (self.pz-(z as f32+0.5)).abs()<0.79
+            && self.py<y as f32+10.0 && self.py+10.76>y as f32 {return false;}
         if !self.set_block(x,y,z,item){return false;}
         self.survival.as_mut().unwrap().use_one(slot);
         true
@@ -616,7 +616,7 @@ impl Game {
         if let (Some(px),Some(py),Some(pz),Some(time),Some(data))=(px,py,pz,time,data) {
             if px.is_finite() && py.is_finite() && pz.is_finite() && time.is_finite() {
                 self.teleport(px,py,pz);
-                self.time=time.rem_euclid(1200.0);
+                self.time=time.rem_euclid(12000.0);
                 for r in data.split(';') {
                     let nums:Vec<i32>=r.split(',').filter_map(|v|v.parse().ok()).collect();
                     if nums.len()==4 {
@@ -645,7 +645,7 @@ mod tests {
         let stored=g.export_survival();
         let mut b=Game::new(543); b.enable_survival();
         assert!(b.import_survival(&stored));
-        assert_eq!(b.survival_items()[1],0); // first slot consumed logs
+        assert_eq!(b.survival_items()[1],1); // one original log left after crafting
         assert!(b.survival_add_item(33,1));
         assert!(!b.survival_craft(3));
         let saved_world=g.export_save();
