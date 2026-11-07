@@ -753,6 +753,10 @@ function action(place=false){
     minigames.action(place,getLook());
     return;
   }
+  if(isSurvival()){
+    if(place)survivalUI.place(getTarget());
+    return; // breaking is a timed Rust action while the mouse is held
+  }
   const found=getTarget();
   if(found.length!==7)return;
   const [x,y,z,tx,ty,tz,id]=found;
@@ -966,7 +970,7 @@ function renderHUD(){
       Math.round(fps)+" FPS | "+visibleChunks+" ACTIVE CHUNKS\n"+
       "XYZ "+player.slice(0,3).map(n=>n.toFixed(2)).join(" / ")+"\n"+
       "Seed "+seed+" | Time "+Math.floor(game.time())+"\n"+
-      "Mode "+(game.flying()?"Creative flight":"Creative")+"\n"+
+      "Mode "+(isSurvival()?"Survival":game.flying()?"Creative flight":"Creative")+"\n"+
       "Water updates "+game.water_pending()+" | Edits "+game.edits_count();
   }
   const degrees=(yaw*180/Math.PI%360+360)%360;
@@ -1070,6 +1074,8 @@ function start(){
   if(isMobile)$("mobile-controls").classList.remove("hidden");
   else canvas.requestPointerLock?.().catch(()=>{});
   if(!minigames?.active){
+    if(isSurvival())survivalUI?.enterSurvival();
+    else survivalUI?.leaveSurvival();
     showHelp();showSelectedName();
   }else {
     $("hud").classList.remove("help-visible");
@@ -1173,6 +1179,7 @@ function connectControls(){
   addEventListener("keydown",e=>{
     if(["Space","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)&&playing)e.preventDefault();
     if(e.code==="Escape"){
+      if(survivalDead)return;
       if(!$("miniLobby").classList.contains("hidden")){
         minigames?.closeLobby();return;
       }
@@ -1197,6 +1204,13 @@ function connectControls(){
       renderHUD();return;
     }
     if(e.code==="KeyH"&&!e.repeat){showHelp();return;}
+    if(e.code==="KeyR"&&!e.repeat&&isSurvival()&&!inventoryOpen){
+      if(game.survival_eat(selected)){
+        survivalUI.renderHotbar();
+        survivalUI.refreshHUD();toast("ATE FOREST BERRIES");
+      }else toast("SELECT BERRIES AND EAT WHEN HUNGRY");
+      return;
+    }
     if(e.code==="KeyE"&&!e.repeat){
       if(minigames?.active)minigames.showRules();
       else toggleInventory();
@@ -1204,12 +1218,12 @@ function connectControls(){
     }
     if(inventoryOpen)return;
     held.add(e.code);
-    if(e.code==="KeyQ"&&!e.repeat && !minigames?.active) {
+    if(e.code==="KeyQ"&&!e.repeat && !minigames?.active && !isSurvival()) {
       // Creative mode: clear selected hotbar slot (no spawned dropped entity).
       inventorySlots[selected]=0;saveInventory();renderHotbar();showSelectedName();
     }
     if(/^Digit[1-9]$/.test(e.code))setSelected(Number(e.code.slice(5))-1);
-    if(e.code==="Space"&&!e.repeat&&!minigames?.active){
+    if(e.code==="Space"&&!e.repeat&&!minigames?.active&&!isSurvival()){
       const now=performance.now();
       if(now-lastSpaceTap<330){
         game.set_flying(!game.flying());
@@ -1217,7 +1231,7 @@ function connectControls(){
         lastSpaceTap=-1000;
       }else lastSpaceTap=now;
     }
-    if(e.code==="KeyF"&&!e.repeat&&!minigames?.active){
+    if(e.code==="KeyF"&&!e.repeat&&!minigames?.active&&!isSurvival()){
       const previous=offhandBlock;
       offhandBlock=inventorySlots[selected];
       inventorySlots[selected]=previous;
@@ -1237,7 +1251,7 @@ function connectControls(){
     if(document.pointerLockElement!==canvas){canvas.requestPointerLock?.().catch(()=>{});return;}
     if(e.button===0){leftHeld=true;action(false);mouseLastAction=performance.now();}
     if(e.button===2){rightHeld=true;action(true);mouseLastAction=performance.now();}
-    if(e.button===1&&!minigames?.active){
+    if(e.button===1&&!minigames?.active&&!isSurvival()){
       // Minecraft-style creative pick block.
       const hit=getTarget();
       if(hit.length===7){
@@ -1318,7 +1332,20 @@ function simulation(dt,time){
     player=game.player();
     target=[];
   }else target=getTarget();
-  if((leftHeld||rightHeld||MOBILE_ACTIONS.break||MOBILE_ACTIONS.place)&&time-mouseLastAction>210) {
+  if(isSurvival()){
+    const sprint=held.has("ControlLeft")||held.has("ControlRight");
+    game.survival_tick(dt,Math.hypot(mx,mz)>.09,sprint);
+    survivalUI.refreshHUD();
+    if(paused)return;
+    if(leftHeld||MOBILE_ACTIONS.break){
+      survivalUI.mine(target,dt);
+    }else{
+      survivalUI.cancelMining();
+    }
+    if((rightHeld||MOBILE_ACTIONS.place)&&time-mouseLastAction>210){
+      action(true);mouseLastAction=time;
+    }
+  }else if((leftHeld||rightHeld||MOBILE_ACTIONS.break||MOBILE_ACTIONS.place)&&time-mouseLastAction>210){
     action(rightHeld||MOBILE_ACTIONS.place);
     mouseLastAction=time;
   }
