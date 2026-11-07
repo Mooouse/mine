@@ -156,8 +156,8 @@ try{
     if(!manual.survival_add_item(11,2))throw Error("Unable to test crafting grid");
     if(!manual.survival_transfer(0,37,true)||
        !manual.survival_transfer(0,40,false))throw Error("Manual ingredient transfer failed");
-    const result=manual.survival_grid_result();
-    if(result[0]!==40||result[1]!==4)throw Error("2x2 recipe layout not recognized");
+    const gridResult=manual.survival_grid_result();
+    if(gridResult[0]!==40||gridResult[1]!==4)throw Error("2x2 recipe layout not recognized");
     const savedGrid=manual.export_survival();
     if(!savedGrid.startsWith("S2|"))throw Error("Crafting grid save format is not S2");
     const restored=new Game(9942);restored.enable_survival();
