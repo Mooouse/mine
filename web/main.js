@@ -1397,6 +1397,7 @@ async function main(){
       invalidate:invalidateBlocks,debris:spawnDebris,
       openInventory,
       isDead:()=>survivalDead,
+      isPlaying:()=>playing&&!menuVisible,
       die:()=>{
         survivalDead=true;paused=true;leftHeld=false;rightHeld=false;held.clear();
         document.exitPointerLock?.();
