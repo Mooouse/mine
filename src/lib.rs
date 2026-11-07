@@ -2,6 +2,8 @@
 mod noise;
 mod survival;
 mod crafting;
+mod creatures;
+use creatures::Creature;
 use survival::{Survival,RECIPES};
 
 use noise::Noise;
@@ -73,6 +75,10 @@ pub struct Game {
     time:f32,
     survival:Option<Survival>,
     fall_peak:f32,
+    creatures:Vec<Creature>,
+    creature_seq:u32,
+    creature_spawn_timer:f32,
+    creature_attack_cooldown:f32,
 }
 
 #[wasm_bindgen]
@@ -89,6 +95,8 @@ impl Game {
             vx:0.0, vy:0.0, vz:0.0,
             grounded:false, flying:false, time:90.0,
             survival:None,fall_peak:34.0,
+            creatures:Vec::new(),creature_seq:0,
+            creature_spawn_timer:0.4,creature_attack_cooldown:0.0,
         };
         let h = game.height_at(8,8);
         game.py = (h + 8) as f32;
@@ -561,8 +569,128 @@ impl Game {
         self.survival.as_mut().is_some_and(|s|s.eat(index))
     }
 
+    /// Local Rust-driven wildlife state: [id,type,x,y,z,heading,stride,hp] per creature.
+    pub fn survival_creatures(&self)->Vec<f32>{
+        if self.survival.is_none(){return Vec::new();}
+        self.creatures.iter().flat_map(|c|c.pack()).collect()
+    }
+
+    /// Combat never accepts a client-supplied target id. Server/game logic
+    /// chooses the nearest visible entity along the camera ray.
+    /// 0 miss, 1 hit, 2 defeated (loot is added if backpack has space).
+    pub fn survival_attack_creature(&mut self,dx:f32,dy:f32,dz:f32,slot:usize)->i32{
+        if slot>=9||self.creature_attack_cooldown>0.0||
+            self.survival.as_ref().is_none_or(|s|s.dead){return 0;}
+        let length=(dx*dx+dy*dy+dz*dz).sqrt();
+        if !length.is_finite()||length<0.1{return 0;}
+        let (dx,dy,dz)=(dx/length,dy/length,dz/length);
+        let eye=(self.px,self.py+1.62,self.pz);
+        let mut candidate=None;
+        let mut best=3.6f32;
+        for (index,m) in self.creatures.iter().enumerate(){
+            let tx=m.x-eye.0;
+            let ty=m.y+if m.kind==1{0.70}else{1.08}-eye.1;
+            let tz=m.z-eye.2;
+            let distance=(tx*tx+ty*ty+tz*tz).sqrt();
+            if distance<0.2||distance>=best{continue;}
+            let dot=(tx*dx+ty*dy+tz*dz)/distance;
+            if dot>0.89{candidate=Some(index);best=distance;}
+        }
+        let Some(index)=candidate else{return 0;};
+        let first_block=self.raycast(eye.0,eye.1,eye.2,dx,dy,dz,best);
+        if first_block.len()==7{
+            let bx=first_block[0] as f32+0.5-eye.0;
+            let by=first_block[1] as f32+0.5-eye.1;
+            let bz=first_block[2] as f32+0.5-eye.2;
+            if (bx*bx+by*by+bz*bz).sqrt()<best-0.65{return 0;}
+        }
+        let equipped=self.survival.as_ref().unwrap().slot(slot).id;
+        let damage=if matches!(equipped,survival::STONE_AXE|survival::STONE_PICK){4}
+            else if matches!(equipped,survival::WOOD_AXE|survival::WOOD_PICK){3}
+            else{2};
+        self.creature_attack_cooldown=0.47;
+        if let Some(s)=self.survival.as_mut(){s.damage_tool(slot);}
+        let mob=&mut self.creatures[index];
+        mob.health-=damage;
+        mob.flee=if mob.kind==1{3.0}else{0.5};
+        if mob.health>0{return 1;}
+        let killed=self.creatures.swap_remove(index);
+        let reward=if killed.kind==1{survival::BERRIES}else{survival::STICK};
+        if let Some(s)=self.survival.as_mut(){s.add(reward,if killed.kind==1{2}else{1});}
+        2
+    }
+
+    fn tick_creatures(&mut self,dt:f32){
+        if self.survival.as_ref().is_none_or(|s|s.dead){return;}
+        let dt=dt.clamp(0.0,0.1);
+        self.creature_attack_cooldown=(self.creature_attack_cooldown-dt).max(0.0);
+        self.creature_spawn_timer-=dt;
+        if self.creature_spawn_timer<=0.0 && self.creatures.len()<10{
+            self.creature_spawn_timer=1.15;
+            for _ in 0..8{
+                let id=self.creature_seq;
+                self.creature_seq+=1;
+                let roll=hash(id as i32+17,(id as i32)*3+91,self.seed ^ 0x6121);
+                let angle=(roll as f32 / u32::MAX as f32)*std::f32::consts::TAU;
+                let distance=10.0+((roll>>9)%15) as f32;
+                let x=self.px+angle.cos()*distance;
+                let z=self.pz+angle.sin()*distance;
+                let (gx,gz)=(x.floor() as i32,z.floor() as i32);
+                let h=self.height_at(gx,gz);
+                if h<=SEA+1 || h>=HEIGHT as i32-3{continue;}
+                if self.block(gx,h+1,gz)!=AIR{continue;}
+                let kind=if creatures::is_night(self.time) && roll%4!=0{2}else{1};
+                self.creatures.push(Creature::new(id,kind,x,h as f32+1.0,z,angle));
+                break;
+            }
+        }
+        let night=creatures::is_night(self.time);
+        let (px,py,pz)=(self.px,self.py,self.pz);
+        let mut i=0;
+        while i<self.creatures.len(){
+            let mut mob=self.creatures[i];
+            let distance=((mob.x-px).powi(2)+(mob.z-pz).powi(2)).sqrt();
+            if distance>48.0{self.creatures.swap_remove(i);continue;}
+            mob.cooldown=(mob.cooldown-dt).max(0.0);
+            mob.flee=(mob.flee-dt).max(0.0);
+            mob.wander+=dt;
+            let aggressive=mob.kind==2 && night && distance<17.0 && (mob.y-py).abs()<5.0;
+            let toward=if aggressive {1.0}else if mob.flee>0.0 {-1.0}else{0.0};
+            let (vx,vz,speed)=if toward!=0.0{
+                let len=distance.max(0.01);
+                ((px-mob.x)/len*toward,(pz-mob.z)/len*toward,
+                    if aggressive{2.25}else{2.7})
+            }else{
+                let wander=mob.id as f32 * 3.31+self.time*0.008+
+                    (mob.wander*0.7).sin()*1.6;
+                (wander.cos(),wander.sin(),if mob.kind==1{0.72}else{1.0})
+            };
+            let nx=mob.x+vx*dt*speed;
+            let nz=mob.z+vz*dt*speed;
+            let old_y=self.height_at(mob.x.floor() as i32,mob.z.floor() as i32);
+            let new_y=self.height_at(nx.floor() as i32,nz.floor() as i32);
+            if (new_y-old_y).abs()<=1 && new_y>SEA+1 &&
+                self.block(nx.floor() as i32,new_y+1,nz.floor() as i32)==AIR{
+                mob.x=nx;mob.z=nz;
+                mob.y+=(new_y as f32+1.0-mob.y)*(dt*8.0).min(1.0);
+                mob.heading=vx.atan2(-vz);
+                mob.stride+=dt*speed*7.0;
+            }else{
+                mob.wander+=dt*2.0;
+            }
+            if aggressive && distance<1.55 && mob.cooldown<=0.0 &&
+                (mob.y-py).abs()<1.8 {
+                if let Some(s)=self.survival.as_mut(){s.damage(2);}
+                mob.cooldown=1.65;
+            }
+            self.creatures[i]=mob;
+            i+=1;
+        }
+    }
+
     pub fn survival_tick(&mut self,dt:f32,moving:bool,sprinting:bool){
         if let Some(s)=self.survival.as_mut(){s.tick(dt,moving,sprinting);}
+        self.tick_creatures(dt);
     }
 
     pub fn survival_damage(&mut self,amount:i32){
