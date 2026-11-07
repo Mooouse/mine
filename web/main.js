@@ -1012,9 +1012,16 @@ function exitMinigameWorld(){
   arenaWorldActive=false;
   game?.free?.();
   game=new Game(seed);
-  const saveData=localStorage.getItem("mine_world_"+seed);
+  if(isSurvival())game.enable_survival();
+  const saveData=localStorage.getItem(saveKey(seed));
   if(saveData)game.import_save(saveData);
+  if(isSurvival()){
+    const survivalData=localStorage.getItem(survivalKey(seed));
+    if(survivalData)game.import_survival(survivalData);
+    survivalUI?.enterSurvival();
+  }else survivalUI?.leaveSurvival();
   player=game.player();target=[];held.clear();crouchBlend=0;
+  renderHotbar();
   playing=false;paused=false;menuVisible=true;
   leftHeld=false;rightHeld=false;
   $("menu").classList.remove("hidden");
@@ -1029,23 +1036,31 @@ function exitMinigameWorld(){
   document.exitPointerLock?.();
   renderHUD();
 }
-function switchWorld(newSeed,loadSaved,skipOldSave=false){
+function switchWorld(newSeed,loadSaved,skipOldSave=false,nextMode=worldMode){
   if(!skipOldSave)save();
   if(inventoryOpen)closeInventory();
-  for(const mesh of meshes.values())disposeMesh(mesh);
-  meshes.clear();chunkData.clear();waterDirty.clear();buildQueue.length=0;
+  clearWorldGraphics();
+  game?.free?.();
   seed=Number(newSeed)>>>0||42042;
+  worldMode=nextMode;
   game=new Game(seed);
-  crouchBlend=0;
+  if(isSurvival())game.enable_survival();
+  crouchBlend=0;survivalDead=false;
   if(loadSaved){
-    const data=localStorage.getItem("mine_world_"+seed);
+    const data=localStorage.getItem(saveKey(seed));
     if(data)game.import_save(data);
+    if(isSurvival()){
+      const extra=localStorage.getItem(survivalKey(seed));
+      if(extra)game.import_survival(extra);
+    }
   }
   $("seedInput").value=seed;
-  loadInventory(!loadSaved);
+  if(isSurvival())survivalUI?.enterSurvival();
+  else {survivalUI?.leaveSurvival();loadInventory(!loadSaved);}
   player=game.player();
   localStorage.setItem("mine_last_seed",String(seed));
-  renderHUD();
+  localStorage.setItem("mine_last_mode",worldMode);
+  renderHotbar();renderHUD();
 }
 function start(){
   playing=true;paused=false;menuVisible=false;
@@ -1081,6 +1096,11 @@ function resume(){
 function returnMenu(){
   if(minigames?.active){minigames.leave(false);return;}
   if(inventoryOpen)closeInventory();
+  survivalUI?.cancelMining();
+  if(survivalDead){
+    $("survivalDeath").classList.add("hidden");
+    survivalDead=false;
+  }
   save();paused=false;playing=false;menuVisible=true;
   $("menu").classList.remove("hidden");
   $("pause").classList.add("hidden");
@@ -1089,20 +1109,32 @@ function returnMenu(){
   document.exitPointerLock?.();
 }
 function connectControls(){
-  $("playButton").addEventListener("click",start);
+  $("worldModePicker").addEventListener("click",e=>{
+    const btn=e.target.closest("[data-world-mode]");
+    if(!btn)return;
+    requestedMode=btn.dataset.worldMode;
+    updateModePicker();
+  });
+  $("playButton").addEventListener("click",()=>{
+    if(requestedMode!==worldMode)switchWorld(seed,true,false,requestedMode);
+    start();
+  });
   $("newButton").addEventListener("click",()=>{
     const n=Number($("seedInput").value)||42042;
-    const old=localStorage.getItem("mine_world_"+(n>>>0));
-    if(old && !confirm("Create a new world with this seed? The previous save for this seed will be replaced."))return;
-    localStorage.removeItem("mine_world_"+(n>>>0));
-    switchWorld(n,false,true);
+    const key=saveKey(n>>>0,requestedMode);
+    const old=localStorage.getItem(key);
+    if(old && !confirm("Create a new "+requestedMode+" world with this seed? The saved "+requestedMode+" world for this seed will be replaced."))return;
+    if(requestedMode===worldMode)save();
+    localStorage.removeItem(key);
+    if(requestedMode==="survival")localStorage.removeItem(survivalKey(n>>>0));
+    switchWorld(n,false,true,requestedMode);
     start();
   });
   $("randomSeed").addEventListener("click",()=>{
     const n=(Math.floor(Math.random()*2147483647)||42);
     $("seedInput").value=n;
   });
-  $("seedInput").addEventListener("change",()=>switchWorld(Number($("seedInput").value),true));
+  $("seedInput").addEventListener("change",()=>switchWorld(Number($("seedInput").value),true,false,requestedMode));
   $("pauseButton").addEventListener("click",pause);
   $("inventoryButton").addEventListener("click",()=>{
     if(minigames?.active)minigames.showRules();else toggleInventory();
@@ -1317,13 +1349,40 @@ async function main(){
     $("loading-progress").style.width="68%";
     const storedSeed=Number(localStorage.getItem("mine_last_seed"))||42042;
     seed=storedSeed>>>0||42042;
+    const oldMode=localStorage.getItem("mine_last_mode");
+    worldMode=oldMode==="survival"?"survival":"creative";
+    requestedMode=worldMode;updateModePicker();
     game=new Game(seed);
-    const data=localStorage.getItem("mine_world_"+seed);
+    if(isSurvival())game.enable_survival();
+    const data=localStorage.getItem(saveKey(seed));
     if(data)game.import_save(data);
+    if(isSurvival()){
+      const state=localStorage.getItem(survivalKey(seed));
+      if(state)game.import_survival(state);
+    }
     player=game.player();
     $("seedInput").value=seed;
-    loadInventory(false);
     initGL();
+    survivalUI=new SurvivalUI({
+      game:()=>game,blocks:BLOCKS,blockIcon,
+      selected:()=>selected,select:setSelected,
+      sound:soundEffect,toast,
+      invalidate:invalidateBlocks,debris:spawnDebris,
+      openInventory,
+      isDead:()=>survivalDead,
+      die:()=>{
+        survivalDead=true;paused=true;leftHeld=false;rightHeld=false;held.clear();
+        document.exitPointerLock?.();
+      },
+      respawn:()=>{
+        survivalDead=false;paused=false;player=game.player();target=[];
+        if(!isMobile)canvas.requestPointerLock?.().catch(()=>{});
+      },
+      returnMenu
+    });
+    loadInventory(false);
+    if(isSurvival())survivalUI.enterSurvival();
+    else survivalUI.leaveSurvival();
     renderHotbar();
     minigames=new MiniGames({
       game:()=>game,player:()=>player,
