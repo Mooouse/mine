@@ -1,5 +1,6 @@
 import init, { Game } from "./pkg/mine_web.js";
 import {MiniGames} from "./minigames.js";
+import {SurvivalUI} from "./survival-ui.js";
 
 // MINE web client. World generation, physics, edits and saves are all Rust/WASM.
 // Only browser input, HTML controls and GPU drawing live in JavaScript.
@@ -23,6 +24,7 @@ const BLOCKS = [
   {name:"COPPER ORE",hex:"#b87e68"}, {name:"GOLD ORE",hex:"#c6a75c"},
   {name:"RED SAND",hex:"#b86943"}, {name:"GLOWSTONE",hex:"#f5ce83"},
 ];
+BLOCKS[33]={name:"WORKBENCH",hex:"#9e754d"};
 const MATERIALS = [...Array.from({length:16},(_,i)=>i+1),...Array.from({length:8},(_,i)=>i+25)];
 const INITIAL_HOTBAR = [1,2,3,4,5,6,7,9,8];
 const INVENTORY_SIZE=36;
@@ -44,6 +46,7 @@ function loadInventory(reset=false){
   renderHotbar();
 }
 function saveInventory(){
+  if(isSurvival())return;
   try{
     localStorage.setItem("mine_inventory_"+seed,JSON.stringify(inventorySlots));
     localStorage.setItem("mine_offhand_"+seed,String(offhandBlock));
@@ -63,6 +66,17 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let game,gl,worldProgram,skyProgram,lineProgram,vaoSky,vaoLine,vboLine;
 let playing=false, paused=false, menuVisible=true, selected=0;
 let minigames=null,botVao=null,botVbo=null,arenaWorldActive=false;
+let survivalUI=null,worldMode="creative",requestedMode="creative",survivalDead=false;
+const isSurvival=()=>worldMode==="survival"&&!arenaWorldActive;
+const saveKey=(id,mode=worldMode)=>mode==="survival"?"mine_survival_world_"+id:"mine_world_"+id;
+const survivalKey=id=>"mine_survival_state_"+id;
+function updateModePicker(){
+  for(const btn of document.querySelectorAll("[data-world-mode]")){
+    const active=btn.dataset.worldMode===requestedMode;
+    btn.classList.toggle("selected",active);
+    btn.setAttribute("aria-pressed",String(active));
+  }
+}
 let yaw=.24,pitch=-.13,sensitivity=1, fov=75, soundEnabled=true, debugVisible=false, renderDistance=3, target=[], player=[8,34,8], seed=42042;
 let previousTime=0, fps=60, frame=0, frameAccumulator=0, lastAutosave=0;
 const held=new Set();
@@ -76,9 +90,10 @@ let glReady=false, visibleChunks=0;
 const waterDirty=new Set();
 let itemToastTimer=0, helpTimer=0, audioContext=null;
 function showSelectedName(){
-  const id=inventorySlots[selected],node=$("itemToast");
+  const id=isSurvival()?(survivalUI?.slots()[selected].id||0):inventorySlots[selected];
+  const node=$("itemToast");
   clearTimeout(itemToastTimer);
-  node.textContent=BLOCKS[id]?.name||"";
+  node.textContent=(isSurvival()?survivalUI?.itemName(id):BLOCKS[id]?.name)||"";
   node.classList.toggle("hidden",!id);
   if(id)itemToastTimer=setTimeout(()=>node.classList.add("hidden"),1700);
 }
@@ -260,6 +275,11 @@ vec3 palette(float m,vec3 n,vec3 p){
     return mix(ore,vec3(.92,.71,.25),step(.78,r)*step(.18,r2));
   }
   if(m<31.5)return vec3(.73,.37,.21)*shade;
+  if(m>32.5){
+    float grid=step(.90,fract(uv.x*4.))*0.18+step(.90,fract(uv.y*4.))*0.16;
+    vec3 wood=top>.5?vec3(.71,.52,.30):vec3(.52,.35,.19);
+    return (wood-grid)*shade;
+  }
   return mix(vec3(.78,.58,.31),vec3(1.0,.87,.52),high)*shade;
 }
 void main(){
@@ -782,6 +802,8 @@ function inventoryButton(id,index,type){
   return el;
 }
 function renderHotbar(){
+  if(isSurvival()&&survivalUI){survivalUI.renderHotbar();return;}
+  $("offhandHud").classList.remove("hidden");
   const hotbar=$("hotbar");hotbar.replaceChildren();
   const off=$("offhandHud");
   off.innerHTML=blockIcon(offhandBlock);
@@ -868,6 +890,11 @@ function drawSlot(container,index){
   container.appendChild(b);
 }
 function renderInventory(){
+  if(isSurvival()&&survivalUI){survivalUI.renderInventory();return;}
+  $("inventory").classList.remove("survival-inventory");
+  $("survivalCraft").classList.add("hidden");
+  $("inventoryKicker").textContent="CREATIVE WORLD";
+  $("inventoryTitle").textContent="Inventory";
   const catalog=$("creativeBlocks"),storage=$("storageSlots"),bar=$("inventoryHotbar"),off=$("inventoryOffhand");
   catalog.replaceChildren();storage.replaceChildren();bar.replaceChildren();off.replaceChildren();
   const query=$("inventorySearch").value.trim().toLowerCase();
@@ -918,6 +945,7 @@ function openInventory(){
 }
 function closeInventory(){
   if(!inventoryOpen)return;
+  if(isSurvival())survivalUI?.leaveInventory();
   inventoryOpen=false;setHeldItem(0);
   $("inventory").classList.add("hidden");
   if(isMobile)$("mobile-controls").classList.remove("hidden");
@@ -928,12 +956,13 @@ function toggleInventory(){if(inventoryOpen)closeInventory();else openInventory(
 function renderHUD(){
   $("coordinates").textContent=player.slice(0,3).map(v=>Math.floor(v)).join(", ");
   $("fps").textContent=Math.round(fps)+" FPS";
-  $("mode").firstChild.textContent=game.flying()?"FLY MODE ":"WALK MODE ";
+  $("mode").firstChild.textContent=isSurvival()?"SURVIVAL ":game.flying()?"FLY MODE ":"WALK MODE ";
   $("block-count").textContent=game.edits_count().toLocaleString();
+  if(isSurvival())survivalUI?.refreshHUD();
   $("block-name").textContent=target.length===7?BLOCKS[(target[6]>=17&&target[6]<=24)?8:target[6]]?.name||"BLOCK":"";
   if(debugVisible){
     $("debugOverlay").textContent=
-      "MINE 0.3 / RUST + WEBASSEMBLY\n"+
+      "MINE 0.5 / RUST + WEBASSEMBLY\n"+
       Math.round(fps)+" FPS | "+visibleChunks+" ACTIVE CHUNKS\n"+
       "XYZ "+player.slice(0,3).map(n=>n.toFixed(2)).join(" / ")+"\n"+
       "Seed "+seed+" | Time "+Math.floor(game.time())+"\n"+
@@ -947,8 +976,10 @@ function renderHUD(){
 function save(){
   if(!game||arenaWorldActive||minigames?.active)return;
   try {
-    localStorage.setItem("mine_world_"+seed,game.export_save());
+    localStorage.setItem(saveKey(seed),game.export_save());
+    if(isSurvival())localStorage.setItem(survivalKey(seed),game.export_survival());
     localStorage.setItem("mine_last_seed",String(seed));
+    localStorage.setItem("mine_last_mode",worldMode);
     saveInventory();
   }catch(e){toast("Storage limit reached. Cannot save additional changes.");}
 }
