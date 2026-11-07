@@ -115,6 +115,51 @@ export class SurvivalUI {
     }
     this.renderInventory();this.renderHotbar();
   }
+  gridClick(index,event){
+    const g=this.api.game();
+    const items=g.survival_items(),cursor=items[36*3]||0;
+    const dest=37+index;
+    if(event.shiftKey){
+      const grid=g.survival_grid_items();
+      if(!grid[index*3])return;
+      const ranges=[...Array(36)].map((_,i)=>i);
+      for(const i of ranges)if(g.survival_transfer(dest,i,false))break;
+    }else{
+      const half=event.button===2;
+      if(cursor)g.survival_transfer(36,dest,half);
+      else g.survival_transfer(dest,36,half);
+    }
+    this.renderInventory();this.renderHotbar();
+  }
+  renderCraftGrid(bench){
+    const g=this.api.game();
+    const grid=$("craftGrid");grid.replaceChildren();
+    grid.classList.toggle("portable",!bench);
+    $("craftGridTitle").textContent="CRAFTING · "+(bench?"3×3 WORKBENCH":"2×2 PORTABLE");
+    const cells=g.survival_grid_items();
+    const indices=bench?[0,1,2,3,4,5,6,7,8]:[0,1,3,4];
+    for(const i of indices){
+      const stack={id:cells[i*3]||0,count:cells[i*3+1]||0,wear:cells[i*3+2]||0};
+      const button=this.itemButton(37+i,stack);
+      button.addEventListener("click",e=>this.gridClick(i,e));
+      button.addEventListener("contextmenu",e=>{e.preventDefault();this.gridClick(i,e);});
+      grid.appendChild(button);
+    }
+    const result=g.survival_grid_result();
+    const button=$("craftResult"),id=result[0]||0,count=result[1]||0;
+    button.disabled=!id;
+    button.title=id?"Craft "+this.itemName(id)+" ×"+count:"Place a valid recipe";
+    button.innerHTML=id?this.icon(id)+this.stackCount({id,count}):"";
+    button.onclick=()=>{
+      if(!g.survival_grid_craft()){
+        this.api.toast("NOT ENOUGH INVENTORY SPACE OR INVALID RECIPE");
+        return;
+      }
+      this.api.sound(true);
+      this.api.toast("CRAFTED "+this.itemName(id));
+      this.renderInventory();this.renderHotbar();
+    };
+  }
   renderInventory(){
     const storage=$("storageSlots"),bar=$("inventoryHotbar"),off=$("inventoryOffhand");
     const catalog=$("creativeBlocks");catalog.replaceChildren();
@@ -142,6 +187,7 @@ export class SurvivalUI {
     $("survivalBenchHint").textContent=bench?
       "WORKBENCH NEARBY — ADVANCED RECIPES UNLOCKED":
       "PORTABLE CRAFTING — PLACE A WORKBENCH FOR TOOLS";
+    this.renderCraftGrid(bench);
     const list=$("survivalRecipeList");list.replaceChildren();
     for(let i=0;i<RECIPES.length;i++){
       const recipe=RECIPES[i];
