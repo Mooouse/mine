@@ -268,7 +268,7 @@ impl Game {
                         if dx*dx+dz*dz>5 {continue;}
                         let y=self.height_at(wx+dx,wz+dz);
                         if (y-base).abs()>1{continue;}
-                        let col_x=(lx+dx) as usize,col_z=(lz+dz) as usize;
+                        let (col_x,col_z)=((lx+dx) as usize,(lz+dz) as usize);
                         let height=if dx.abs()+dz.abs()<=1{3}else{1};
                         for k in 1..=height {
                             b[idx(col_x,(y+k) as usize,col_z)]=
@@ -287,7 +287,7 @@ impl Game {
                 }}
                 if flat && h>SEA+2 && h<HEIGHT as i32-8 && self.biome(wx,wz)!=1{
                     for dx in -2i32..=2 {for dz in -2i32..=2{
-                        let lx=(8+dx) as usize,lz=(8+dz) as usize;
+                        let (lx,lz)=((8+dx) as usize,(8+dz) as usize);
                         for iy in h+1..=h+4 {
                             let old=idx(lx,iy as usize,lz);
                             b[old]=AIR; // clear vegetation only inside the footprint
