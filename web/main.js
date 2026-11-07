@@ -1066,7 +1066,7 @@ function renderHUD(){
   $("block-name").textContent=target.length===7?BLOCKS[(target[6]>=17&&target[6]<=24)?8:target[6]]?.name||"BLOCK":"";
   if(debugVisible){
     $("debugOverlay").textContent=
-      "MINE 0.5 / RUST + WEBASSEMBLY\n"+
+      "MINE 0.6 / RUST + WEBASSEMBLY\n"+
       Math.round(fps)+" FPS | "+visibleChunks+" ACTIVE CHUNKS\n"+
       "XYZ "+player.slice(0,3).map(n=>n.toFixed(2)).join(" / ")+"\n"+
       "Seed "+seed+" | Time "+Math.floor(game.time())+"\n"+
