@@ -931,6 +931,58 @@ mod tests {
         }
     }
     #[test]
+    fn manual_two_by_two_crafting_is_atomic_and_saved(){
+        let mut g=Game::new(2712);
+        g.enable_survival();
+        assert!(g.survival_add_item(11,2));
+        assert!(g.survival_transfer(0,37,true));
+        assert!(g.survival_transfer(0,40,true));
+        assert_eq!(g.survival_grid_result(),vec![survival::STICK as i32,4,1]);
+        let before=g.export_survival();
+        assert!(before.starts_with("S2|"));
+        let mut copy=Game::new(2712);copy.enable_survival();
+        assert!(copy.import_survival(&before));
+        assert_eq!(copy.survival_grid_result(),vec![survival::STICK as i32,4,1]);
+        assert!(copy.survival_grid_craft());
+        assert_eq!(copy.survival_grid_items().iter().sum::<i32>(),0);
+        assert_eq!(copy.survival_items()[1],4);
+        assert!(!copy.survival_grid_craft());
+
+        // Existing Alpha 0.5 (S1) inventories still load with empty craft slots.
+        let s2=copy.export_survival();
+        let mut parts=s2.splitn(5,'|');
+        let _version=parts.next();
+        let h=parts.next().unwrap();let hunger=parts.next().unwrap();
+        let ex=parts.next().unwrap();
+        let old_items=parts.next().unwrap().split(';').take(37).collect::<Vec<_>>().join(";");
+        let old=format!("S1|{h}|{hunger}|{ex}|{old_items}");
+        let mut legacy=Game::new(2712);legacy.enable_survival();
+        assert!(legacy.import_survival(&old));
+        assert_eq!(legacy.survival_items()[1],4);
+        assert!(legacy.survival_grid_items().iter().all(|v|*v==0));
+    }
+
+    #[test]
+    fn wildlife_spawns_and_rust_melee_hits_nearest_target(){
+        let mut g=Game::new(3718);g.enable_survival();
+        g.set_time(900.0);
+        for _ in 0..150{g.survival_tick(0.05,false,false);}
+        let packed=g.survival_creatures();
+        assert!(!packed.is_empty() && packed.len()%8==0);
+        assert!(packed.iter().all(|v|v.is_finite()));
+        // Place a target close to an unobstructed camera line.
+        g.creatures.clear();
+        g.teleport(8.5,55.0,8.5);
+        for x in 8..=13{for y in 55..=59{g.set_block(x,y,8,0);}}
+        g.creatures.push(Creature::new(500,1,10.2,55.0,8.5,0.0));
+        let hit=g.survival_attack_creature(1.7,-0.92,0.0,0);
+        assert_eq!(hit,1);
+        assert_eq!(g.creatures[0].health,3);
+        // Cooldown stops instant double hits, and attacks are ray-targeted.
+        assert_eq!(g.survival_attack_creature(1.7,-0.92,0.0,0),0);
+    }
+
+    #[test]
     fn generated_world_is_deterministic() {
         let mut a=Game::new(123);
         let mut b=Game::new(123);
