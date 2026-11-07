@@ -77,7 +77,19 @@
           <input type="search" id="inventorySearch" placeholder="Search blocks..." aria-label="Search blocks" autocomplete="off"/>
           <div id="creativeBlocks" class="inv-catalog-grid"></div>
           <div id="survivalCraft" class="survival-craft hidden">
-            <p>Gather resources and craft useful items. Tools require a nearby placed workbench.</p>
+            <p>Move items from your backpack into the crafting grid. Click the output to craft. A nearby workbench unlocks 3×3 recipes.</p>
+            <div class="craft-workbench-ui">
+              <div class="craft-grid-column">
+                <div class="craft-section-caption" id="craftGridTitle">CRAFTING · 2×2</div>
+                <div id="craftGrid" class="craft-grid" role="group" aria-label="Crafting grid"></div>
+              </div>
+              <div class="craft-arrow" aria-hidden="true">➜</div>
+              <div class="craft-output-column">
+                <span class="craft-section-caption">RESULT</span>
+                <button id="craftResult" class="inv-slot craft-result" type="button" aria-label="Crafting result"></button>
+              </div>
+            </div>
+            <div class="craft-section-caption craft-recipe-caption">RECIPE BOOK · QUICK CRAFT</div>
             <div id="survivalRecipeList" class="survival-recipe-list"></div>
             <div class="survival-craft-hint" id="survivalBenchHint">PORTABLE CRAFTING • PLACE A WORKBENCH FOR TOOLS</div>
           </div>
@@ -124,7 +136,7 @@
         <button id="newButton" class="secondary-button">CREATE NEW WORLD <span>＋</span></button>
       </div>
       <div class="seed-row"><label for="seedInput">WORLD SEED</label><input id="seedInput" type="text" inputmode="numeric" value="42042" maxlength="10"/><button id="randomSeed" title="Randomize seed" aria-label="Randomize seed">↻</button></div>
-      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.5 · SURVIVAL</span></div>
+      <div class="menu-bottom"><span>POWERED BY <b>RUST + WEBASSEMBLY</b></span><span>ALPHA 0.6 · LIVING WORLD</span></div>
     </div>
     <div class="menu-scenery-caption">EXPLORE <span>•</span> CREATE <span>•</span> DISCOVER</div>
   </div>
