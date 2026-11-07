@@ -37,6 +37,12 @@
 .survival-inventory .inv-browser>.inv-section-title{display:none}
 .survival-inventory .inv-storage-grid{margin-top:10px}
 .survival-inventory .inv-browser{min-width:0}
+.survival-inventory .inv-window{
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-color:#a4b99b #37463e;
+  scrollbar-width:thin;
+}
 .survival-inventory .inv-hint{font-size:10px}
 .survival-craft{display:flex;flex-direction:column;gap:9px}
 .survival-craft p{
