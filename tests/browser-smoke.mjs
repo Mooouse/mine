@@ -91,6 +91,10 @@ try{
   await page.locator("#survivalCraft").waitFor({state:"visible"});
   if(await page.locator("#survivalRecipeList .survival-recipe").count()!==9)
     throw new Error("Expected 9 Rust-backed recipes");
+  if(await page.locator("#craftGrid .inv-slot").count()!==4)
+    throw new Error("Portable crafting must display four 2x2 grid cells");
+  if(!await page.locator("#craftResult").isDisabled())
+    throw new Error("Crafting result should be disabled for an empty grid");
   if(await page.locator("#inventoryHotbar .inv-slot").count()!==9)
     throw new Error("Survival inventory missing hotbar");
   if(await page.locator("#storageSlots .inv-slot").count()!==27)
@@ -147,8 +151,27 @@ try{
     if(g.survival_status()[2]!==1)throw Error("Death state not set");
     g.survival_respawn();
     if(g.survival_status()[0]!==20||g.survival_status()[2]!==0)throw Error("Respawn failed");
+    // Position-based 2x2 crafting, from inventory to grid, then persisted.
+    const manual=new Game(9942);manual.enable_survival();
+    if(!manual.survival_add_item(11,2))throw Error("Unable to test crafting grid");
+    if(!manual.survival_transfer(0,37,true)||
+       !manual.survival_transfer(0,40,false))throw Error("Manual ingredient transfer failed");
+    const result=manual.survival_grid_result();
+    if(result[0]!==40||result[1]!==4)throw Error("2x2 recipe layout not recognized");
+    const savedGrid=manual.export_survival();
+    if(!savedGrid.startsWith("S2|"))throw Error("Crafting grid save format is not S2");
+    const restored=new Game(9942);restored.enable_survival();
+    if(!restored.import_survival(savedGrid))throw Error("Cannot restore crafted items to 2x2 grid");
+    if(restored.survival_grid_result()[0]!==40||!restored.survival_grid_craft())
+      throw Error("Manual crafting failed after save/reload");
+    if(restored.survival_items()[1]!==4)throw Error("Manual crafted output not collected");
+    if(!g.export_save().startsWith("M2|"))throw Error("New world generator not versioned");
+    const legacy=new Game(9941);
+    if(!legacy.import_save(g.export_save().replace(/^M2/,"M1")))
+      throw Error("Older M1 world files must remain readable");
+    legacy.free();restored.free();manual.free();
     copy.free();g.free();
-    return "Rust survival craft, mining, tool, health, save, respawn";
+    return "Rust shaped 2x2 crafting, S2 save, M1 compatibility, mining, tool, health, respawn";
   });
   await page.locator('[data-world-mode="creative"]').click();
   await page.locator("#playButton").click();
@@ -159,7 +182,7 @@ try{
     throw new Error("Creative inventory was not restored");
 
   if(errors.length) throw new Error("Browser errors: "+errors.join(" | "));
-  console.log("PASS: WASM + WebGL2, creative + Survival, 9 recipes, resource mining, tools, health, independent saves, 5 arcade arenas and bots; "+rules);
+  console.log("PASS: WASM + WebGL2, creative + Survival, shaped crafting grid, 9 recipes, resource mining, tools, health, independent saves, 5 arcade arenas and bots; "+rules);
 }finally{
   await browser.close();
 }
