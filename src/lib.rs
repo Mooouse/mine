@@ -261,7 +261,7 @@ impl Game {
             if marker%7==2 {
                 let lx=5+((marker>>7)%6) as i32;
                 let lz=5+((marker>>11)%6) as i32;
-                let wx=cx*16+lx,wz=cz*16+lz;
+                let (wx,wz)=(cx*16+lx,cz*16+lz);
                 let base=self.height_at(wx,wz);
                 if base>SEA+2 && base<HEIGHT as i32-8 {
                     for dx in -2i32..=2 {for dz in -2i32..=2{
@@ -279,7 +279,7 @@ impl Game {
             }
             // Rare abandoned stone outlooks, with a small illuminated center.
             if marker%29==8 {
-                let wx=cx*16+8,wz=cz*16+8;
+                let (wx,wz)=(cx*16+8,cz*16+8);
                 let h=self.height_at(wx,wz);
                 let mut flat=true;
                 for dx in -2..=2 {for dz in -2..=2 {
