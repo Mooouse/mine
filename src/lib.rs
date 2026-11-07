@@ -666,6 +666,22 @@ mod tests {
         assert!(Game::new(543).import_save(&saved_world));
     }
     #[test]
+    fn fall_damage_applies_only_in_survival(){
+        let mut survival=Game::new(781);
+        survival.enable_survival();
+        for x in 7..=9 {for z in 7..=9{
+            assert!(survival.set_block(x,59,z,3));
+        }}
+        survival.teleport(8.5,70.0,8.5);
+        for _ in 0..180{survival.step(0.04,0.0,0.0,false,false,0.0,false);}
+        assert!(survival.survival_status()[0]<20,
+            "large drops should hurt in survival worlds");
+        let mut creative=Game::new(781);
+        creative.teleport(8.5,70.0,8.5);
+        for _ in 0..180{creative.step(0.04,0.0,0.0,false,false,0.0,false);}
+        assert_eq!(creative.survival_status(),vec![20,20,0]);
+    }
+    #[test]
     fn generated_world_is_deterministic() {
         let mut a=Game::new(123);
         let mut b=Game::new(123);
