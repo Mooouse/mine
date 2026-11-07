@@ -38,17 +38,17 @@ pub fn block_kind(id:u8)->u8 {match id{
     _=>0
 }}
 pub fn hardness(id:u8)->f32 {match id{
-    0=>00.0,1|2|4|7|26|31=>0.75,5|28|11|33=>10.8,
-    3|12|15|25=>20.8,13|29|30|32=>30.2,
-    6|16=>0.35,10=>0.35,9=>10.9,14=>0.05,_=>10.0,
+    0=>0.0,1|2|4|7|26|31=>0.75,5|28|11|33=>1.8,
+    3|12|15|25=>2.8,13|29|30|32=>3.2,
+    6|16=>0.35,10=>0.35,9=>1.9,14=>0.05,_=>1.0,
 }}
 pub fn mine_seconds(id:u8, tool:u8)->f32 {
     let hardness=hardness(id);
-    if hardness<=00.0 {return 00.0;}
+    if hardness<=0.0 {return 0.0;}
     if tool_kind(tool)==block_kind(id)&&block_kind(id)!=0 {
         if matches!(tool,STONE_PICK|STONE_AXE|STONE_SHOVEL){hardness*0.18}
         else {hardness*0.28}
-    }else { hardness * if block_kind(id)==1 {20.0}else{10.15} }
+    }else { hardness * if block_kind(id)==1 {2.0}else{1.15} }
 }
 pub fn drop_for(id:u8,seed:u32,x:i32,y:i32,z:i32,tool:u8)->u8 {
     let rock=matches!(id,3|12|13|15|25|29|30|32);
@@ -96,7 +96,7 @@ pub struct Survival{
 impl Default for Survival{
     fn default()->Self {
         Self{slots:[Stack::default();SLOT_COUNT],health:20,hunger:20,
-            exhausted:00.0,regen:00.0,dead:false,mine_at:None,mine_progress:00.0}
+            exhausted:0.0,regen:0.0,dead:false,mine_at:None,mine_progress:0.0}
     }
 }
 impl Survival{
@@ -177,7 +177,7 @@ impl Survival{
             }
         }
         let mut candidate=Self{slots:temp,..Self::default()};
-        if !candidate.add(recipe.output0.0,recipe.output0.1){return false;}
+        if !candidate.add(recipe.output.0,recipe.output.1){return false;}
         self.slots=candidate.slots;
         true
     }
@@ -193,25 +193,25 @@ impl Survival{
     }
     pub fn tick(&mut self,dt:f32,moving:bool,sprinting:bool){
         if self.dead{return;}
-        let dt=dt.clamp(00.0,00.1);
+        let dt=dt.clamp(0.0,0.1);
         self.exhausted+=dt*(if moving {if sprinting {0.09}else{0.038}}else{0.012});
-        while self.exhausted>=10.0{
-            self.exhausted-=10.0;
+        while self.exhausted>=1.0{
+            self.exhausted-=1.0;
             if self.hunger>0{self.hunger-=1;}else{self.damage(1);}
         }
         if self.hunger>=17&&self.health<20{
             self.regen+=dt;
-            if self.regen>=30.7{
+            if self.regen>=3.7{
                 self.health=(self.health+1).min(20);
-                self.regen=00.0;
+                self.regen=0.0;
                 self.exhausted+=0.35;
             }
-        }else{self.regen=00.0;}
+        }else{self.regen=0.0;}
     }
     pub fn respawn(&mut self){
         self.health=20;self.hunger=20;self.dead=false;
-        self.exhausted=00.0;self.regen=00.0;
-        self.mine_at=None;self.mine_progress=00.0;
+        self.exhausted=0.0;self.regen=0.0;
+        self.mine_at=None;self.mine_progress=0.0;
     }
     pub fn export(&self)->String{
         let mut s=format!("S1|{}|{}|{}|",self.health,self.hunger,self.exhausted);
@@ -228,7 +228,7 @@ impl Survival{
         let Some(h)=p.next().and_then(|s|s.parse::<i32>().ok())else{return false;};
         let Some(n)=p.next().and_then(|s|s.parse::<i32>().ok())else{return false;};
         let Some(e)=p.next().and_then(|s|s.parse::<f32>().ok())else{return false;};
-        if !(0..=20).contains(&h)||!(0..=20).contains(&n)||!e.is_finite()||!(00.0..=10.5).contains(&e){return false;}
+        if !(0..=20).contains(&h)||!(0..=20).contains(&n)||!e.is_finite()||!(0.0..=1.5).contains(&e){return false;}
         let Some(items)=p.next()else{return false;};
         let rows:Vec<_>=items.split(';').collect();
         if rows.len()!=SLOT_COUNT{return false;}
@@ -245,7 +245,7 @@ impl Survival{
             temp[i]=Stack{id,count,wear};
         }
         self.slots=temp;self.health=h;self.hunger=n;self.exhausted=e;
-        self.dead=h==0;self.mine_at=None;self.mine_progress=00.0;
+        self.dead=h==0;self.mine_at=None;self.mine_progress=0.0;
         true
     }
 }
