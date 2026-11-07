@@ -264,11 +264,11 @@ mod tests{
     #[test] fn recipes_are_atomic_and_require_workbench(){
         let mut s=Survival::default();
         assert!(s.add(5,2));assert!(s.craft(0,false));
-        assert!(s.craft(1,false));
+        assert!(s.craft(0,false));assert!(s.craft(1,false));
         assert!(!s.craft(3,false));
         assert!(s.craft(3,true));
         assert_eq!(s.count(WOOD_PICK),1);
-        assert_eq!(s.count(11),1);
+        assert_eq!(s.count(11),3);
     }
     #[test] fn damage_health_and_import_are_safe(){
         let mut s=Survival::default();s.damage(100);
